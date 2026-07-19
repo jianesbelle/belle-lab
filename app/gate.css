@@ -1,0 +1,11 @@
+.gate-backdrop{position:fixed;inset:0;z-index:100;background:rgba(24,30,67,.72);backdrop-filter:blur(8px);display:grid;place-items:center;padding:20px}
+.gate-card{width:min(410px,100%);position:relative;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:36px;box-shadow:0 28px 80px rgba(20,25,56,.35)}
+.gate-close{position:absolute;right:16px;top:13px;border:0;background:transparent;color:var(--muted);font-size:26px;cursor:pointer}
+.gate-icon{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--indigo);color:#fff;font-family:serif;font-size:20px;font-weight:900;margin-bottom:20px}
+.gate-card h2{font-family:serif;color:var(--ink);font-size:26px;margin:5px 0}
+.gate-card>p:not(.eyebrow):not(.gate-error){font-size:13px;color:var(--muted);line-height:1.6}
+.gate-card label{display:block;margin:22px 0 14px;color:#44495d;font-size:12px;font-weight:800}
+.gate-card input{width:100%;margin-top:8px;border:1px solid var(--line);background:#fff;padding:14px;border-radius:10px;outline:none}
+.gate-card input:focus{border-color:var(--indigo);box-shadow:0 0 0 3px rgba(39,52,105,.1)}
+.gate-error{color:#b44238;background:#fff0ed;padding:9px;border-radius:8px;font-size:11px}
+.gate-card .primary{width:100%}

@@ -1,11 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
+import { db, ensureFirebaseAuth } from "../lib/firebase";
 
 type View = "home" | "diagnostic" | "theory" | "create" | "reflect";
-type Student = { id: number; studentNo: string; nickname: string };
+type Student = { id: string; studentNo: string; nickname: string };
 type DashboardStudent = {
-  id: number; studentNo: string; nickname: string; level: string | null; stage: number | null;
+  id: string | number; studentNo: string; nickname: string; level: string | null; stage: number | null;
   helpNeeded: boolean | null; agency: number | null; creativity: number | null;
   communication: number | null; responsibility: number | null; updatedAt: string | null;
 };
@@ -16,6 +18,12 @@ const demoStudents: DashboardStudent[] = [
   { id: 3, studentNo: "20312", nickname: "여울", level: "기초", stage: 2, helpNeeded: true, agency: 58, creativity: 54, communication: 61, responsibility: 68, updatedAt: "오늘" },
   { id: 4, studentNo: "20318", nickname: "바람", level: "도전", stage: 3, helpNeeded: false, agency: 70, creativity: 73, communication: 75, responsibility: 71, updatedAt: "어제" },
 ];
+
+async function sha256(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 const theory = [
   { icon: "둥", title: "리듬과 장단", copy: "소리의 길고 짧음, 규칙적인 박, 강약이 모여 음악의 움직임을 만들어요.", task: "말붙임새를 손뼉으로 치며 3소박을 찾아보세요." },
@@ -40,6 +48,33 @@ function Header({ teacher, setTeacher, nickname }: { teacher: boolean; setTeache
   );
 }
 
+function TeacherGate({ open, onClose, onSuccess }: { open: boolean; onClose: () => void; onSuccess: () => void }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  if (!open) return null;
+  function unlock(e: FormEvent) {
+    e.preventDefault();
+    if (pin === "0719") {
+      setPin(""); setError(""); onSuccess();
+    } else {
+      setError("교사 비밀번호가 맞지 않습니다.");
+      setPin("");
+    }
+  }
+  return <div className="gate-backdrop" role="dialog" aria-modal="true" aria-labelledby="teacher-gate-title">
+    <form className="gate-card" onSubmit={unlock}>
+      <button type="button" className="gate-close" onClick={onClose} aria-label="닫기">×</button>
+      <span className="gate-icon">교</span>
+      <p className="eyebrow">TEACHER ONLY</p>
+      <h2 id="teacher-gate-title">교사 대시보드 잠금</h2>
+      <p>학생별 학습 기록을 보려면 교사 비밀번호를 입력하세요.</p>
+      <label>교사 비밀번호<input autoFocus type="password" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="숫자 4자리" /></label>
+      {error && <p className="gate-error">{error}</p>}
+      <button className="primary" type="submit">대시보드 열기 <span>→</span></button>
+    </form>
+  </div>;
+}
+
 function Entry({ onEnter, onTeacher }: { onEnter: (s: Student) => void; onTeacher: () => void }) {
   const [studentNo, setStudentNo] = useState("");
   const [nickname, setNickname] = useState("");
@@ -55,13 +90,24 @@ function Entry({ onEnter, onTeacher }: { onEnter: (s: Student) => void; onTeache
     }
     setLoading(true); setMessage("");
     try {
-      const res = await fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ studentNo, nickname, pin }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onEnter({ id: data.student.id, studentNo, nickname: data.student.nickname });
+      await ensureFirebaseAuth();
+      const id = `student-${(await sha256(studentNo)).slice(0, 32)}`;
+      const ref = doc(db, "students", id);
+      const saved = await getDoc(ref);
+      const pinHash = await sha256(`sorigyeol:${studentNo}:${pin}`);
+      if (saved.exists() && saved.data().pinHash !== pinHash) throw new Error("비밀번호가 맞지 않아요.");
+      if (!saved.exists()) await setDoc(ref, {
+        studentNo, nickname: nickname.trim(), pinHash, level: "기초", stage: 1,
+        helpNeeded: false, agency: 0, creativity: 0, communication: 0, responsibility: 0,
+        createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      });
+      onEnter({ id, studentNo, nickname: saved.exists() ? String(saved.data().nickname) : nickname.trim() });
     } catch (error) {
       if (error instanceof Error && error.message.includes("비밀번호")) setMessage(error.message);
-      else onEnter({ id: Date.now(), studentNo, nickname });
+      else {
+        setMessage("Firebase 연결을 확인해 주세요. 지금은 체험 모드로 시작합니다.");
+        onEnter({ id: `demo-${Date.now()}`, studentNo, nickname });
+      }
     } finally { setLoading(false); }
   }
 
@@ -99,6 +145,7 @@ function Entry({ onEnter, onTeacher }: { onEnter: (s: Student) => void; onTeache
 export function MusicLearningApp() {
   const [student, setStudent] = useState<Student | null>(null);
   const [teacher, setTeacher] = useState(false);
+  const [teacherGate, setTeacherGate] = useState(false);
   const [view, setView] = useState<View>("home");
   const [diagnostic, setDiagnostic] = useState<number[]>([]);
   const [theme, setTheme] = useState("우리 동네");
@@ -127,25 +174,30 @@ export function MusicLearningApp() {
     if (!student) return;
     setSaved("저장 중…");
     try {
-      await fetch("/api/progress", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
-        studentId: student.id, level, stage, diagnosticScore: score, lyrics, theme, rhythm, tempo, dynamics, timbre,
+      await ensureFirebaseAuth();
+      await setDoc(doc(db, "students", student.id), {
+        studentNo: student.studentNo, nickname: student.nickname, level, stage, diagnosticScore: score, lyrics, theme, rhythm, tempo, dynamics, timbre,
         reflection, helpNeeded, ...competencies,
-      }) });
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
       setSaved("저장했어요 ✓");
     } catch { setSaved("이 기기에 임시 저장했어요"); }
     setTimeout(() => setSaved(""), 2500);
   }
 
+  const openTeacherGate = () => setTeacherGate(true);
+  const unlockTeacher = () => { setTeacherGate(false); setTeacher(true); };
+
   if (teacher) return <><Header teacher setTeacher={setTeacher} /><TeacherDashboard /></>;
-  if (!student) return <><Header teacher={false} setTeacher={setTeacher} /><Entry onEnter={setStudent} onTeacher={() => setTeacher(true)} /></>;
+  if (!student) return <><Header teacher={false} setTeacher={(next) => next && openTeacherGate()} /><Entry onEnter={setStudent} onTeacher={openTeacherGate} /><TeacherGate open={teacherGate} onClose={() => setTeacherGate(false)} onSuccess={unlockTeacher} /></>;
 
   const nav = [
     ["home", "나의 여정"], ["diagnostic", "소리 진단"], ["theory", "음악 요소"], ["create", "민요 개사"], ["reflect", "성찰·제출"],
   ] as [View, string][];
 
-  return (
+  return (<>
     <div className="app-shell">
-      <Header teacher={false} setTeacher={setTeacher} nickname={student.nickname} />
+      <Header teacher={false} setTeacher={(next) => next && openTeacherGate()} nickname={student.nickname} />
       <aside className="sidebar">
         <div className="student-chip"><span>{student.nickname.slice(0, 1)}</span><div><b>{student.nickname}</b><small>{student.studentNo}</small></div></div>
         <nav>{nav.map(([id, label], i) => <button key={id} className={view === id ? "active" : ""} onClick={() => setView(id)}><span>0{i + 1}</span>{label}</button>)}</nav>
@@ -160,7 +212,8 @@ export function MusicLearningApp() {
         {view === "reflect" && <ReflectView {...{ reflection, setReflection, helpNeeded, setHelpNeeded, competencies, saveProgress }} />}
       </main>
     </div>
-  );
+    <TeacherGate open={teacherGate} onClose={() => setTeacherGate(false)} onSuccess={unlockTeacher} />
+  </>);
 }
 
 function HomeView({ nickname, level, competencies, setView }: { nickname: string; level: string; competencies: Record<string, number>; setView: (v: View) => void }) {
@@ -229,7 +282,21 @@ function ReflectView({ reflection, setReflection, helpNeeded, setHelpNeeded, com
 function TeacherDashboard() {
   const [rows, setRows] = useState<DashboardStudent[]>(demoStudents);
   const [filter, setFilter] = useState("전체");
-  useEffect(() => { fetch("/api/dashboard").then(r => r.json()).then(d => { if (d.students?.length) setRows(d.students); }).catch(() => null); }, []);
+  useEffect(() => {
+    ensureFirebaseAuth().then(() => getDocs(collection(db, "students"))).then((snapshot) => {
+      const loaded = snapshot.docs.map((item) => {
+        const data = item.data();
+        return {
+          id: item.id, studentNo: String(data.studentNo ?? ""), nickname: String(data.nickname ?? ""),
+          level: String(data.level ?? "기초"), stage: Number(data.stage ?? 1), helpNeeded: Boolean(data.helpNeeded),
+          agency: Number(data.agency ?? 0), creativity: Number(data.creativity ?? 0),
+          communication: Number(data.communication ?? 0), responsibility: Number(data.responsibility ?? 0),
+          updatedAt: data.updatedAt?.toDate ? data.updatedAt.toDate().toLocaleString("ko-KR") : "기록 없음",
+        } satisfies DashboardStudent;
+      });
+      if (loaded.length) setRows(loaded);
+    }).catch(() => null);
+  }, []);
   const shown = filter === "도움 필요" ? rows.filter(r => r.helpNeeded) : filter === "미완료" ? rows.filter(r => (r.stage ?? 0) < 5) : rows;
   const avg = (key: keyof DashboardStudent) => Math.round(rows.reduce((sum, r) => sum + Number(r[key] ?? 0), 0) / Math.max(rows.length, 1));
   return <main className="teacher-page"><div className="teacher-intro"><div><p className="eyebrow">교사 대시보드 · 2학기 창작 수행</p><h1>학생의 결과보다<br /><em>배움의 과정</em>을 봅니다</h1></div><div className="class-select"><span>수업 선택</span><select><option>2학년 3반 · 음악</option><option>2학년 4반 · 음악</option></select></div></div>
