@@ -1,0 +1,910 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>갓쌤연수원 대기 화면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@500;700;900&family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+/* 방송 대기 화면처럼: 16:9 무대 하나를 화면에 맞춰 키우고, 위에 시계, 아래에 진행 막대. 한 가지 어두운 화면으로 고정 */
+:root {
+  --ink: #0f1830;
+  --ink-2: #18234a;
+  --ink-3: #212e5c;
+  --line: #2c3a6b;
+  --grid: rgba(120, 150, 230, 0.07);
+  --paper: #f3f5fb;
+  --muted: #9aa6c8;
+  --blue: #5b9bff;
+  --blue-soft: rgba(91, 155, 255, 0.16);
+  --glow: rgba(91, 155, 255, 0.22);
+  --glow-soft: rgba(91, 155, 255, 0.07);
+  --blue-2: #8fbaff;
+  --signal: #ffd25e;
+  --signal-ink: #2a2000;
+  --display: "Gothic A1", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+/* 회원 연수: 같은 구성에 보라 계열로 바꿔 한눈에 구분 */
+body.member {
+  --ink: #170f2e; --ink-2: #221843; --ink-3: #2d2154; --line: #3d2e6e;
+  --grid: rgba(180, 150, 255, 0.07); --muted: #ab9fcf;
+  --blue: #b592ff; --blue-2: #dcc8ff; --blue-soft: rgba(181, 146, 255, 0.17);
+  --glow: rgba(181, 146, 255, 0.24); --glow-soft: rgba(181, 146, 255, 0.07);
+}
+.viewport, .stage { transition: background-color .6s; }
+.brand .who-for { margin-left: 22px; padding: 9px 18px; border-radius: 999px; font: 700 20px/1 var(--body); background: var(--blue-soft); color: var(--blue); border: 1px solid var(--blue); }
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--paper); font-family: var(--body); overflow: hidden; }
+
+.viewport { position: fixed; inset: 0; background: var(--ink); overflow: hidden; }
+.turn { position: absolute; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); text-align: center; color: var(--muted); font: 500 15px/1.5 var(--body); display: none; }
+@media (orientation: portrait) { .turn { display: block; } }
+.stage {
+  width: 1600px; height: 900px; position: absolute; left: 50%; top: 50%; transform-origin: center center; overflow: hidden;
+  background:
+    radial-gradient(900px 520px at 88% -10%, var(--glow), transparent 70%),
+    radial-gradient(700px 420px at -5% 110%, rgba(255,210,94,0.08), transparent 70%),
+    linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+    var(--ink);
+}
+
+/* 위쪽 막대 */
+.bar { position: absolute; top: 0; left: 0; right: 0; height: 110px; padding: 0 80px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 16px; }
+.mark { width: 48px; height: 48px; border-radius: 12px; background: var(--blue); color: var(--ink); display: grid; place-items: center; font: 900 26px/1 var(--display); }
+.brand b { font: 700 26px/1.2 var(--display); display: block; }
+.brand span { font-size: 18px; color: var(--muted); }
+.clock { display: flex; align-items: center; gap: 18px; padding: 12px 14px 12px 26px; border-radius: 999px; background: var(--ink-2); border: 1px solid var(--line); }
+.clock .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--signal); box-shadow: 0 0 0 0 rgba(255,210,94,0.6); animation: pulse 2s infinite; }
+.clock .label { font-size: 22px; color: var(--muted); }
+.clock .time { font: 600 38px/1 var(--mono); color: var(--ink); background: var(--signal); padding: 8px 18px; border-radius: 999px; font-variant-numeric: tabular-nums; min-width: 142px; text-align: center; }
+.clock.no-time .time { display: none; }
+.clock.no-time { padding-right: 28px; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255,210,94,0.55); } 70% { box-shadow: 0 0 0 12px rgba(255,210,94,0); } 100% { box-shadow: 0 0 0 0 rgba(255,210,94,0); } }
+
+/* 장면 */
+.scenes { position: absolute; top: 130px; bottom: 120px; left: 96px; right: 96px; }
+.scene { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity .7s ease, visibility .7s; }
+.scene.on { opacity: 1; visibility: visible; }
+.scene.on .rise { animation: rise .8s cubic-bezier(.2,.7,.2,1) both; }
+.scene.on .rise.d1 { animation-delay: .12s; } .scene.on .rise.d2 { animation-delay: .24s; } .scene.on .rise.d3 { animation-delay: .36s; } .scene.on .rise.d4 { animation-delay: .48s; }
+@keyframes rise { from { transform: translateY(22px); opacity: .25; } to { transform: none; opacity: 1; } }
+
+.eyebrow { display: inline-flex; align-items: center; gap: 14px; font: 600 22px/1 var(--mono); color: var(--signal); letter-spacing: .06em; margin: 0 0 22px; }
+.eyebrow::before { content: ""; width: 36px; height: 3px; background: var(--signal); border-radius: 2px; }
+h2 { font: 900 66px/1.16 var(--display); margin: 0; letter-spacing: -0.02em; text-wrap: balance; }
+h2 em { font-style: normal; color: var(--blue); }
+.lede { font-size: 26px; line-height: 1.6; color: var(--muted); margin: 24px 0 0; max-width: 30em; }
+.tag { display: inline-block; margin-top: 30px; padding: 10px 20px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font: 700 22px/1.2 var(--body); }
+.fine { font-size: 20px; color: var(--muted); margin: 26px 0 0; }
+
+.two { display: grid; grid-template-columns: 1.15fr 1fr; gap: 80px; align-items: center; height: 100%; }
+
+/* 1 소개 */
+.hero { font-size: 84px; }
+.stats { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+.stats li { padding: 22px 0; border-top: 1px solid var(--line); display: flex; align-items: baseline; justify-content: space-between; gap: 24px; }
+.stats li:last-child { border-bottom: 1px solid var(--line); }
+.stats b { font: 900 92px/1 var(--display); color: var(--paper); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stats b small { font-size: 34px; color: var(--blue); margin-left: 6px; letter-spacing: 0; }
+.stats span { font-size: 26px; color: var(--muted); }
+
+/* 2 무료로 듣는 법 */
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 56px; margin-top: 56px; }
+.step { position: relative; padding: 40px 36px; border-radius: 24px; background: var(--ink-2); border: 1px solid var(--line); min-height: 250px; }
+.step:not(:last-child)::after { content: "→"; position: absolute; right: -44px; top: 50%; transform: translateY(-50%); font: 700 34px/1 var(--body); color: var(--muted); }
+.step .n { font: 600 22px/1 var(--mono); color: var(--signal); }
+.step h3 { font: 700 36px/1.3 var(--display); margin: 22px 0 12px; }
+.step p { font-size: 22px; line-height: 1.5; color: var(--muted); margin: 0; }
+.step.last { background: var(--blue); border-color: var(--blue); }
+.step.last .n, .step.last p { color: rgba(15,24,48,0.75); }
+.step.last h3 { color: var(--ink); }
+
+/* 3 직무연수 */
+.jik { display: grid; grid-template-columns: 1.6fr 1fr; gap: 64px; height: 100%; align-items: start; }
+.jik h2 { font-size: 58px; }
+.jlist { list-style: none; margin: 30px 0 0; padding: 0; }
+.jlist li { display: grid; grid-template-columns: 170px 1fr auto; gap: 28px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.jlist li:first-child { border-top: 1px solid var(--line); }
+.jd { font: 600 28px/1.1 var(--mono); color: var(--paper); font-variant-numeric: tabular-nums; }
+.jd small { display: block; font: 500 18px/1.4 var(--body); color: var(--muted); margin-top: 6px; }
+.jt { min-width: 0; font: 700 28px/1.3 var(--body); }
+.jt small { display: block; font-weight: 400; font-size: 19px; color: var(--muted); margin-top: 4px; }
+.dd { font: 600 20px/1 var(--mono); padding: 9px 14px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); white-space: nowrap; }
+.dd.hot { background: var(--signal); color: var(--signal-ink); }
+.note { margin-top: 64px; padding: 40px 40px; border-radius: 28px; background: var(--ink-2); border: 1px solid var(--line); display: grid; gap: 30px; }
+.note div span { display: block; font: 600 18px/1 var(--mono); color: var(--signal); letter-spacing: .06em; margin-bottom: 10px; }
+.note .where { display: block; font: 500 22px/1.4 var(--body); color: var(--muted); margin-top: 8px; }
+.note .must { font-style: normal; color: var(--signal); }
+.note div b { font: 700 32px/1.35 var(--display); }
+
+/* 4 뉴스레터 */
+.mailwrap { position: relative; height: 470px; }
+.mail { position: absolute; inset: 20px 30px 20px 30px; border-radius: 22px; background: var(--paper); color: var(--ink); padding: 40px 44px; transform: rotate(-2deg); box-shadow: 0 30px 60px rgba(0,0,0,0.35); }
+.mail.back { background: var(--ink-3); transform: rotate(3deg) translate(18px, 12px); box-shadow: none; border: 1px solid var(--line); }
+.mail .from { font-size: 19px; color: #5b6685; display: flex; justify-content: space-between; }
+.mail h4 { font: 900 36px/1.3 var(--display); margin: 18px 0 26px; }
+.mail ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.mail li { display: flex; gap: 16px; align-items: center; font-size: 26px; font-weight: 500; }
+.mail li::before { content: ""; width: 14px; height: 14px; border-radius: 4px; background: #2f6fe4; flex: none; }
+
+/* 5 공모전 */
+.with { font: 700 24px/1.3 var(--body); color: var(--paper); margin: 0 0 18px; }
+.with i { font-style: normal; color: var(--muted); margin: 0 10px; }
+.contest-name { font: 900 40px/1.2 var(--display); color: var(--blue); margin: 26px 0 0; letter-spacing: -0.01em; }
+.prize { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 0; margin-top: 40px; }
+.prize div { padding: 4px 40px; border-left: 1px solid var(--line); display: grid; gap: 8px; }
+.prize div:first-child { padding-left: 0; border-left: 0; }
+.prize b { font: 900 70px/1 var(--display); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.prize b small { font-size: 28px; color: var(--blue); margin-left: 4px; letter-spacing: 0; }
+.prize div:first-child b { color: var(--signal); }
+.prize span { font-size: 22px; color: var(--muted); }
+.due { margin: 44px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font: 700 30px/1.3 var(--body); }
+.due .dd { font-size: 24px; padding: 10px 16px; }
+.due i { flex-basis: 100%; font-style: normal; font-weight: 400; font-size: 22px; color: var(--muted); }
+.areas { display: grid; gap: 20px; }
+.area { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 20px; padding: 30px 34px; border-radius: 22px; background: var(--ink-2); border: 1px solid var(--line); }
+.area span { font: 600 20px/1 var(--mono); color: var(--signal); }
+.area b { font: 700 32px/1.3 var(--display); }
+
+/* 6 단톡방 */
+.chat { display: grid; gap: 22px; padding: 36px; border-radius: 30px; background: rgba(24,35,74,0.6); border: 1px solid var(--line); }
+.msg { max-width: 92%; }
+.msg .who { margin: 0; padding: 0; background: none; font-size: 18px; color: var(--muted); margin: 0 0 8px 6px; }
+.msg p:not(.who) { margin: 0; padding: 20px 26px; border-radius: 6px 24px 24px 24px; background: var(--ink-3); font-size: 26px; line-height: 1.45; }
+.msg.me { justify-self: end; }
+.msg.me .who { text-align: right; margin-right: 6px; }
+.msg.me p:not(.who) { background: var(--signal); color: var(--signal-ink); border-radius: 24px 6px 24px 24px; font-weight: 500; }
+
+/* 7 QR */
+.qrs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin-top: 40px; max-width: 1240px; }
+.qcard { display: grid; justify-items: center; text-align: center; gap: 22px; padding: 32px 24px; border-radius: 26px; background: var(--ink-2); border: 1px solid var(--line); }
+.qcard.main { border-color: var(--blue); background: linear-gradient(180deg, var(--blue-soft), var(--glow-soft)), var(--ink-2); }
+.qbox { box-sizing: border-box; width: 200px; height: 200px; border-radius: 16px; background: #ffffff; padding: 14px; display: grid; place-items: center; }
+.qbox img, .qbox canvas { width: 172px !important; height: 172px !important; }
+.qbox.find { background: var(--ink-3); border: 2px dashed var(--line); color: var(--paper); text-align: center; font: 700 22px/1.45 var(--body); padding: 18px; }
+.qbox.find small { display: block; font-weight: 400; color: var(--muted); font-size: 17px; margin-top: 8px; }
+.qcard h3 { font: 700 30px/1.3 var(--display); margin: 0 0 10px; }
+.qcard p { margin: 0 auto; max-width: 15em; font-size: 20px; line-height: 1.5; color: var(--muted); }
+.qcard .url { display: block; margin-top: 12px; font: 600 20px/1 var(--mono); color: var(--blue); }
+
+
+/* 큐레이션·수강권 */
+.qrside { display: grid; justify-items: center; gap: 22px; }
+.bigqr { width: 340px; height: 340px; border-radius: 28px; background: #ffffff; padding: 26px; box-sizing: border-box; display: grid; place-items: center; box-shadow: 0 0 0 10px var(--blue-soft); }
+.bigqr img, .bigqr canvas { width: 288px !important; height: 288px !important; }
+.qrcap { font: 700 26px/1.3 var(--body); text-align: center; }
+.qrcap small { display: block; font: 500 20px/1.4 var(--body); color: var(--signal); margin-top: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 40px; }
+.chip { padding: 14px 24px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-2); font: 700 26px/1.2 var(--body); }
+.chip.hi { background: var(--signal); color: var(--signal-ink); border-color: var(--signal); }
+.new { display: inline-block; font: 600 18px/1 var(--mono); background: var(--signal); color: var(--signal-ink); padding: 6px 10px; border-radius: 6px; margin-right: 12px; letter-spacing: .04em; }
+.tl { margin-top: 48px; display: grid; gap: 26px; }
+.tl-row { display: grid; grid-template-columns: 130px 1fr; gap: 22px; align-items: center; }
+.tl-row > span { font: 700 24px/1.2 var(--body); color: var(--muted); }
+.tl-row.pass > span { color: var(--paper); }
+.track { position: relative; height: 58px; border-radius: 14px; background: var(--ink-2); border: 1px solid var(--line); overflow: hidden; }
+.fill { box-sizing: border-box; position: absolute; top: 0; bottom: 0; left: 0; display: flex; align-items: center; padding: 0 20px; font: 700 22px/1 var(--body); white-space: nowrap; }
+.tl-row.now .fill { width: 16%; background: var(--ink-3); color: var(--paper); }
+.tl-row.now .end { position: absolute; left: calc(16% + 18px); top: 50%; transform: translateY(-50%); font: 500 20px/1 var(--body); color: var(--muted); }
+.tl-row.pass .fill { width: 100%; background: linear-gradient(90deg, var(--blue), var(--blue-2)); color: var(--ink); justify-content: space-between; }
+.scene.on .tl-row.pass .fill { animation: grow 1.4s .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes grow { from { width: 16%; } to { width: 100%; } }
+.tl-note { font-size: 24px; color: var(--muted); margin: 6px 0 0 152px; }
+.tl-note b { color: var(--paper); }
+
+.today { height: 100%; display: flex; flex-direction: column; justify-content: center; max-width: 1300px; }
+.t-when { font: 600 40px/1 var(--mono); color: var(--signal); margin: 0 0 30px; font-variant-numeric: tabular-nums; }
+.t-title { font-size: 92px; line-height: 1.14; letter-spacing: -0.03em; }
+.t-title.long { font-size: 72px; }
+.t-title.xlong { font-size: 58px; }
+.t-title small { display: block; font: 500 36px/1.4 var(--body); color: var(--muted); margin-top: 22px; letter-spacing: 0; }
+.t-who { margin: 44px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 18px; font: 700 34px/1.2 var(--body); }
+.t-who span:first-child::before { content: "강사 "; color: var(--muted); font-weight: 400; }
+.t-kind { padding: 10px 18px; border-radius: 999px; background: var(--blue-soft); color: var(--blue); font-size: 24px; }
+.chatqr { display: flex; align-items: center; gap: 28px; margin-top: 36px; }
+.chatqr p { margin: 0; font: 700 30px/1.3 var(--body); }
+.chatqr p small { display: block; font: 500 20px/1.4 var(--body); color: var(--muted); margin-top: 8px; }
+/* 아래쪽 */
+.foot { position: absolute; left: 96px; right: 96px; bottom: 0; height: 100px; display: flex; align-items: center; gap: 48px; }
+.prog { flex: 1; display: flex; gap: 10px; }
+.seg { flex: 1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.seg i { display: block; height: 100%; width: 0; background: var(--blue); }
+.seg.done i { width: 100%; background: var(--muted); }
+.site { font: 600 22px/1 var(--mono); color: var(--muted); white-space: nowrap; }
+.site b { color: var(--paper); font-weight: 600; }
+
+/* 운영자용 설정 (화면 공유에 잘 안 보이도록 구석에, 마우스 멈추면 숨김) */
+.ctrl-btn { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-2); color: var(--paper); font: 500 14px/1 var(--body); cursor: pointer; transition: opacity .4s; }
+body.idle .ctrl-btn:not(:focus-visible), body.idle .remote:not(:focus-within) { opacity: 0; pointer-events: none; }
+.remote { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: var(--ink-2); border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.4); transition: opacity .4s; }
+.remote button { min-width: 72px; padding: 11px 16px; border: 0; border-radius: 999px; background: transparent; color: var(--paper); font: 600 15px/1 var(--body); cursor: pointer; }
+.remote button:hover { background: var(--ink-3); }
+.remote .mid { background: var(--blue); color: var(--ink); min-width: 80px; }
+.remote .mid.paused { background: var(--signal); color: var(--signal-ink); }
+.panel { position: fixed; right: 16px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 20; width: min(360px, calc(100vw - 32px)); padding: 20px; border-radius: 18px; background: var(--ink-2); border: 1px solid var(--line); box-shadow: 0 20px 50px rgba(0,0,0,0.45); display: grid; gap: 16px; font-size: 14px; }
+.panel[hidden] { display: none; }
+.panel { max-height: calc(100vh - 100px); overflow-y: auto; }
+.pair2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+.checks label { display: flex; align-items: center; gap: 8px; color: var(--paper); font-size: 13.5px; cursor: pointer; padding: 6px 2px; }
+.panel .checks input { width: 18px; margin: 0; border: 0; height: 18px; padding: 0; accent-color: var(--blue); flex: none; }
+.panel h5 { margin: 0; font: 700 16px/1.3 var(--body); }
+.panel .row { display: grid; gap: 8px; }
+.panel label { color: var(--muted); font-size: 13px; }
+.seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.panel button, .panel input { font: 500 14px/1 var(--body); color: var(--paper); background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 8px; cursor: pointer; }
+.panel input { cursor: text; width: 100%; box-sizing: border-box; }
+.panel button[aria-pressed="true"] { background: var(--blue); border-color: var(--blue); color: var(--ink); font-weight: 700; }
+.pair { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.panel .hint { color: var(--muted); font-size: 12.5px; line-height: 1.55; margin: 0; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; }
+
+/* 배경 음악 */
+.onair { display: none; align-items: center; gap: 12px; font: 600 20px/1 var(--body); color: var(--muted); white-space: nowrap; }
+body.music-on .onair { display: inline-flex; }
+.onair .eq { display: inline-flex; align-items: flex-end; gap: 3px; height: 20px; }
+.onair .eq i { width: 4px; height: 100%; border-radius: 2px; background: var(--signal); transform-origin: bottom; animation: eq 1.1s ease-in-out infinite; }
+.onair .eq i:nth-child(2) { animation-delay: -.35s; } .onair .eq i:nth-child(3) { animation-delay: -.7s; } .onair .eq i:nth-child(4) { animation-delay: -.2s; }
+@keyframes eq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+.remote .music.on { color: var(--signal); }
+.ytwrap { position: fixed; left: -9999px; top: 0; width: 200px; height: 200px; }
+.panel select { font: 500 14px/1.2 var(--body); color: var(--paper); background: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 10px 8px; width: 100%; }
+.panel input[type=range] { padding: 0; border: 0; background: none; accent-color: var(--blue); height: 24px; }
+.mstate { color: var(--signal); font-size: 12.5px; line-height: 1.5; margin: 0; min-height: 1.5em; }
+
+@media (prefers-reduced-motion: reduce) {
+  .onair .eq i { animation: none !important; }
+  .scene, .scene.on .rise, .clock .dot { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="viewport">
+  <div class="stage" id="stage">
+    <header class="bar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">AI</div>
+        <div><b>AI미래교육연구회</b><span>갓쌤연수원</span></div>
+        <span class="who-for" id="whoFor">공개 연수</span>
+      </div>
+      <div class="clock" id="clock">
+        <span class="dot" aria-hidden="true"></span>
+        <span class="label" id="clockLabel">연수 시작까지</span>
+        <span class="time" id="clockTime">10:00</span>
+      </div>
+    </header>
+
+    <main class="scenes" id="scenes">
+
+      <section class="scene" data-key="today">
+        <div class="today">
+          <p class="eyebrow rise" id="tEye">오늘의 연수</p>
+          <p class="t-when rise d1" id="tWhen">10.12 (월) 19:00</p>
+          <h2 class="t-title rise d2" id="tTitle">연수 제목</h2>
+          <p class="t-who rise d3"><span id="tWho">강사</span><span class="t-kind" id="tKind" hidden>직무연수</span></p>
+        </div>
+      </section>
+
+      <section class="scene s-intro" data-key="intro">
+        <div class="two">
+          <div>
+            <p class="eyebrow rise">전국 교사 연구회</p>
+            <h2 class="hero rise d1">선생님이 만드는<br><em>AI 수업</em>,<br>함께 연구해요</h2>
+            <p class="lede rise d2">2021년에 시작해 유치원부터 특수학교까지, 전국 선생님들이 분과별로 AI·에듀테크·바이브코딩 수업을 연구하고 나눠요.</p>
+            <span class="tag rise d3">정회원 모집 · 매년 3월, 9월</span>
+          </div>
+          <ul class="stats">
+            <li class="rise d1"><b>2,600<small>명+</small></b><span>함께하는 회원</span></li>
+            <li class="rise d2"><b>18<small>개</small></b><span>연구 분과</span></li>
+            <li class="rise d3"><b>180<small>개+</small></b><span>한 해 여는 연수</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="scene" data-key="contest">
+        <div class="two">
+          <div>
+            <p class="eyebrow rise">NWEC 26 바이브코딩 공모전</p>
+            <p class="with rise d1">AI미래교육연구회<i>×</i>네이버</p>
+            <h2 class="rise d1">내가 만든 수업 도구가<br><em>전국 교실</em>로</h2>
+            <div class="prize rise d2">
+              <div><b>650<small>만원</small></b><span>총상금</span></div>
+              <div><b>200<small>만원</small></b><span>최우수상</span></div>
+              <div><b>10<small>팀</small></b><span>전원 시상</span></div>
+            </div>
+            <p class="due rise d3"><span class="dd hot" id="contestDD">D-9</span>접수 마감 10/18(일)<i>최종 경연 11/28(토) · 네이버 1784</i></p>
+          </div>
+          <div class="qrside rise d2">
+            <div class="bigqr" data-qr="contest"></div>
+            <p class="qrcap">찍으면 바로 신청</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="curation">
+        <div class="two">
+          <div>
+            <p class="eyebrow rise"><span class="new">NEW</span>갓쌤 큐레이션</p>
+            <h2 class="rise d1">뭐부터 들을지 고민될 땐<br><em>골라 담기만</em> 하세요</h2>
+            <div class="chips rise d2">
+              <span class="chip">강좌 한눈에 보기</span>
+              <span class="chip">마음에 드는 연수 담기</span>
+              <span class="chip hi">로그인 없이 바로</span>
+            </div>
+          </div>
+          <div class="qrside rise d2">
+            <div class="bigqr" data-qr="curation"></div>
+            <p class="qrcap">지금 찍어서 열어 보세요<small>카톡 말고 크롬·사파리로 열어야 저장돼요</small></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="pass">
+        <div class="two">
+          <div>
+            <p class="eyebrow rise">무제한 수강권</p>
+            <h2 class="rise d1">지난 연수,<br><em>2주 지나도</em> 다시 봐요</h2>
+            <div class="tl rise d2">
+              <div class="tl-row now"><span>지금</span><div class="track"><div class="fill">2주</div><span class="end">그 뒤엔 못 봐요</span></div></div>
+              <div class="tl-row pass"><span>수강권</span><div class="track"><div class="fill"><span>지난 연수 + 새 연수 전부</span><span>~2027.2.28</span></div></div></div>
+            </div>
+          </div>
+          <div class="qrside rise d2">
+            <div class="bigqr" data-qr="pass"></div>
+            <p class="qrcap">찍으면 신청 안내가 열려요</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="free">
+        <p class="eyebrow rise">공개 연수 무료로 듣는 법</p>
+        <h2 class="rise d1">회원가입만 하면 <em>바로 들을 수 있어요</em></h2>
+        <div class="steps">
+          <div class="step rise d2"><span class="n">1</span><h3>갓쌤연수원<br>회원가입</h3><p>godedu.co.kr에서 간단하게 가입해요.</p></div>
+          <div class="step rise d3"><span class="n">2</span><h3>정규 연수 →<br>무료 연수 탭</h3><p>메뉴에서 무료 연수 탭을 눌러요.</p></div>
+          <div class="step last rise d4"><span class="n">3</span><h3>공개 연수<br>바로 수강</h3><p>지난 공개 연수도 다시 볼 수 있어요.</p></div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="jikmu">
+        <div class="jik">
+          <div>
+            <p class="eyebrow rise">직무연수 신청 안내</p>
+            <h2 class="rise d1">이수증이 나오는 <em>직무연수</em></h2>
+            <ul class="jlist" id="jlist"></ul>
+          </div>
+          <div class="note rise d2">
+            <div><span>대상</span><b>정회원 중<br>사전 신청한 선생님</b></div>
+            <div><span>이수 기준</span><b>전체 시간의 <em class="must">80% 이상</em><br>들어야 이수증 발급</b></div>
+            <div><span>신청</span><b>구글폼으로 <em class="must">따로 신청</em><br><small class="where">카톡 공지방 공지글에 링크</small></b></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="letter">
+        <div class="two">
+          <div>
+            <p class="eyebrow rise">뉴스레터</p>
+            <h2 class="rise d1">한 달에 두 번,<br><em>메일함으로</em> 찾아가요</h2>
+            <p class="lede rise d2">갓쌤연수원에 가입하면 뉴스레터가 자동으로 와요. 새 연수 소식과 수업에 바로 쓰는 자료를 담았어요.</p>
+            <span class="tag rise d3">월 2회 이상 발송</span>
+          </div>
+          <div class="mailwrap rise d2">
+            <div class="mail back" aria-hidden="true"></div>
+            <div class="mail">
+              <div class="from"><span>AI미래교육연구회 뉴스레터</span><span>받은편지함</span></div>
+              <h4>이번 호에 담은 것</h4>
+              <ul>
+                <li>이번 달 새 연수 일정</li>
+                <li>수업에 바로 쓰는 자료</li>
+                <li>써 보면 좋은 AI 도구</li>
+                <li>분과 연구 소식</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="chat">
+        <div class="two">
+          <div>
+            <p class="eyebrow rise">무료 단톡방</p>
+            <h2 class="rise d1">무료 연수 소식,<br><em>단톡방에서 먼저</em> 받아요</h2>
+            <p class="lede rise d2">무료 연수 안내, 수업 자료, 업체 이벤트 소식을 나눠요.</p>
+            <div class="chatqr rise d3"><div class="qbox" data-qr="chat"></div><p>찍으면 바로 입장<small>AI무료 연수 &amp; 실전 활용 꿀팁 단톡방</small></p></div>
+          </div>
+          <div class="chat" aria-label="단톡방 대화 예시">
+            <div class="msg rise d1"><p class="who">운영진</p><p>다음 주 무료 연수 열려요. 신청 링크 올려 둘게요.</p></div>
+            <div class="msg rise d2"><p class="who">운영진</p><p>오늘 수업에 바로 써 본 자료 공유해요.</p></div>
+            <div class="msg rise d3"><p class="who">운영진</p><p>에듀테크 무료 체험 이벤트 소식이에요.</p></div>
+            <div class="msg me rise d4"><p class="who">선생님</p><p>감사해요! 바로 써 볼게요.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="scene" data-key="qr">
+        <p class="eyebrow rise">지금 들어와 보세요</p>
+        <h2 class="rise d1">휴대폰 카메라로 <em>QR을 비추면</em> 바로 열려요</h2>
+        <div class="qrs" id="qrs"></div>
+      </section>
+
+    </main>
+
+    <footer class="foot">
+      <div class="prog" id="prog" aria-hidden="true"></div>
+      <div class="onair" aria-hidden="true"><span class="eq"><i></i><i></i><i></i><i></i></span><span id="onairName">Jazz</span></div>
+      <div class="site"><b>갓쌤연수원</b> godedu.co.kr</div>
+    </footer>
+  </div>
+  <p class="turn">휴대폰을 가로로 돌리면 크게 보여요</p>
+</div>
+
+<div class="remote" role="group" aria-label="넘기기">
+  <button type="button" id="prevBtn" aria-label="이전 장">‹ 이전</button>
+  <button type="button" id="pauseBtn" class="mid">멈춤</button>
+  <button type="button" id="nextBtn" aria-label="다음 장">다음 ›</button>
+  <button type="button" id="musicBtn" class="music" aria-pressed="false">♪ 음악</button>
+</div>
+<button class="ctrl-btn" id="ctrlBtn" type="button" aria-expanded="false" aria-controls="panel">설정</button>
+<div class="panel" id="panel" hidden>
+  <h5>대기 화면 설정</h5>
+  <div class="row">
+    <label>지금은</label>
+    <div class="seg3" role="group" aria-label="모드">
+      <button type="button" id="mBefore" data-mode="before">시작 전</button>
+      <button type="button" id="mBreak" data-mode="break">쉬는 시간</button>
+      <button type="button" id="mLoop" data-mode="loop">소식만</button>
+    </div>
+  </div>
+  <div class="row">
+    <label>보여 줄 장</label>
+    <div class="pair2">
+      <button type="button" id="presetAll">공개 연수</button>
+      <button type="button" id="presetMember">회원 연수</button>
+    </div>
+    <div class="checks" id="checks"></div>
+  </div>
+  <div class="row">
+    <label for="minutes">시계 (분)</label>
+    <div class="pair"><input id="minutes" type="number" min="1" max="60" step="1" value="10"><button type="button" id="restart">다시 맞추기</button></div>
+  </div>
+  <div class="row">
+    <label for="secs">한 장 보여 주는 시간 (초)</label>
+    <input id="secs" type="number" min="4" max="60" step="1" value="10">
+  </div>
+  <div class="row">
+    <label for="station">배경 음악</label>
+    <select id="station"></select>
+    <div class="pair"><input id="ytUrl" type="url" placeholder="유튜브 링크 붙여 넣기"><button type="button" id="ytUse">이걸로</button></div>
+    <div class="pair"><input id="vol" type="range" min="0" max="100" step="1" value="35" aria-label="음량"><button type="button" id="musicBtn2">켜기</button></div>
+    <div class="checks" style="grid-template-columns:1fr"><label><input type="checkbox" id="autoFade" checked><span>시계가 0이 되면 음악 줄이기</span></label></div>
+    <p class="mstate" id="mstate" role="status"></p>
+  </div>
+  <button type="button" id="fsBtn">전체 화면</button>
+  <p class="hint">줌에서 화면 공유 → 이 창을 고르면 돼요. 송출 중에는 아래 가운데 버튼으로 멈추고 넘겨요. 마우스를 가만히 두면 버튼들은 사라져요. 키보드: ← → 넘기기, 스페이스 멈춤, F 전체 화면, M 음악.<br>음악까지 들리게 하려면 줌 화면 공유 창 아래 <b>‘소리 공유’</b>를 꼭 체크하세요.</p>
+</div>
+<div class="ytwrap" id="ytwrap"><div id="yt"></div></div>
+
+<script>
+/* ===== 여기만 고치면 돼요 ===== */
+const LINKS = {
+  site: "https://godedu.co.kr",
+  cafe: "https://cafe.naver.com/edu3dprinter?tc=shared_link",
+  chat: "https://open.kakao.com/o/gj60qcqi",
+  curation: "https://script.google.com/macros/s/AKfycbyREotOwNaaI68S7VEvCnny3yKGig3DQVRiu2R3oT4uShHmkKXOzXqVl-Xvalkw8rzc/exec?login=off",
+  pass: "https://forms.gle/wCEjP6hutP4yVFQa7",
+  contest: "https://whalespace.io/contest/nwec/2026#apply-entry"
+};
+// 직무연수: 지난 연수는 저절로 빠져요. 새 연수는 줄을 하나 더 넣으면 돼요.
+const JIKMU = [
+  { at: "2026-10-12T19:00", title: "클로드, 오늘 처음 켭니다", sub: "구글 시트·한글(hwp)까지 말로 시키기" },
+  { at: "2026-10-19T19:30", title: "학생의 생각이 보이는 수업", sub: "스노클 AI피드백으로 깊어지다" },
+  { at: "2026-10-25T19:00", title: "클로드에 날개 달기", sub: "VS Code·옵시디언으로 내 작업실 만들기" },
+  { at: "2026-10-28T19:00", title: "퀴즈 수업의 정석, 퀴즈앤", sub: "퀴즈 그 이상의 퀴즈" },
+  { at: "2026-10-30T19:00", title: "Claude로 업무효율 200% 높이기", sub: "" },
+  { at: "2026-11-02T20:00", title: "바로 써먹는 ZEP 방탈출 맵 만들기", sub: "" },
+  { at: "2026-11-07T10:00", title: "클로드 손 넓히기", sub: "깃허브로 학교·집 컴퓨터 잇기" }
+];
+// 오늘의 연수: 날짜가 오늘인 연수를 찾아 첫 장에 띄워요 (주강사 이름)
+const TRAININGS = [
+  { at: "2026-10-12T19:00", title: "클로드, 오늘 처음 켭니다 : 구글 시트 · 한글(hwp)까지 말로 시키기", who: "안정연", kind: "직무" },
+  { at: "2026-10-14T19:30", title: "AI 바이브코딩 히어로", who: "장규진" },
+  { at: "2026-10-18T20:00", title: "문해력·수리력 쑥쑥! 기초학력 맞춤형 코스웨어를 활용한 교실 수업 설계", who: "박진해" },
+  { at: "2026-10-19T19:30", title: "학생의 생각이 보이는 수업, 스노클 AI피드백으로 깊어지다", who: "김주영", kind: "직무" },
+  { at: "2026-10-21T19:00", title: "캔바 영상 편집, 이제 내 것을 고르세요", who: "우지연" },
+  { at: "2026-10-23T20:00", title: "교실과 일상을 바꾸는 맞춤형 AI 영어 에듀테크", who: "김수정" },
+  { at: "2026-10-24T10:00", title: "준비는 가볍게, 몰입은 깊게 — 모두를 위한 코딩 수업", who: "최은석" },
+  { at: "2026-10-25T19:00", title: "클로드에 날개 달기 : VS Code · 옵시디언으로 내 작업실 만들기", who: "안정연", kind: "직무" },
+  { at: "2026-10-26T19:00", title: "캔바로 초간단 영상편집하기", who: "황은지" },
+  { at: "2026-10-28T19:00", title: "퀴즈 수업의 정석, 퀴즈 그 이상의 퀴즈앤", who: "반기리", kind: "직무" },
+  { at: "2026-10-29T20:00", title: "'티칭'에서 '코칭'으로: AI 코스웨어로 한 명도 놓치지 않는 수학 수업", who: "노기현" },
+  { at: "2026-10-30T19:00", title: "Claude(클로드)로 업무효율 200% 높이기", who: "김대붕", kind: "직무" },
+  { at: "2026-11-02T20:00", title: "바로 써먹는 ZEP 방탈출 맵 만들기", who: "강태영", kind: "직무" },
+  { at: "2026-11-04T19:00", title: "학생을 위한 올인원 AI 교육 도구 '바이브블록' 수업 활용법", who: "고회림" },
+  { at: "2026-11-07T10:00", title: "클로드 손 넓히기 : 깃허브로 학교·집 컴퓨터 잇고, 쓰던 프로그램 전부 연결하기", who: "안정연", kind: "직무" }
+];
+// 배경 음악: 유튜브 재즈 라이브. 안 나오는 영상은 저절로 다음 걸로 넘어가요. 줄을 더 넣어도 돼요.
+const STATIONS = [
+  { id: "ovEwMim9Hks", name: "Smooth Jazz Radio" },
+  { id: "sbQVS0RbA_Q", name: "Cozy Cafe Jazz" },
+  { id: "i4rPPbYugzQ", name: "Warm Evening Jazz Café" },
+  { id: "vB1JEixRQOg", name: "Elegant Jazz Café" },
+  { id: "uNmzXUl8jA8", name: "Rainy Noir Jazz" },
+  { id: "mt81hWTA4Wo", name: "Warm Noir Jazz Cat" },
+  { id: "cEyzOqjkY1M", name: "Smooth Jazz Guitar" }
+];
+// 공모전: 마감이 지나면 이 장은 저절로 빠져요
+const CONTEST_END = new Date("2026-10-18T23:59:59");
+/* ============================ */
+
+const $ = (s) => document.querySelector(s);
+const WD = ["일","월","화","수","목","금","토"];
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("gw:" + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("gw:" + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+const PRESETS = {
+  open: ["today", "intro", "contest", "curation", "free", "chat", "qr"],
+  member: ["today", "contest", "curation", "pass", "jikmu"]
+};
+const ALL_KEYS = ["today", "intro", "contest", "curation", "pass", "free", "jikmu", "letter", "chat", "qr"];
+const hideFor = (name) => ALL_KEYS.filter(k => !PRESETS[name].includes(k));
+let hidden = store.get("hide4", hideFor("open"));
+const SCENE_NAMES = { today: "오늘의 연수", intro: "연구회 소개", contest: "공모전 (10/18까지)", curation: "갓쌤 큐레이션", pass: "무제한 수강권", free: "무료로 듣는 법", jikmu: "직무연수", letter: "뉴스레터", chat: "무료 단톡방 (QR 포함)", qr: "QR 모음" };
+
+/* 무대 크기 맞추기 */
+function fit() {
+  const s = Math.min(window.innerWidth / 1600, window.innerHeight / 900);
+  $("#stage").style.transform = "translate(-50%, -50%) scale(" + s + ")";
+}
+window.addEventListener("resize", fit); fit();
+
+/* 직무연수 목록 */
+function dayDiff(a, b) {
+  const x = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+  const y = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((x - y) / 86400000);
+}
+function buildJikmu() {
+  const now = new Date();
+  const up = JIKMU.map(j => ({ ...j, d: new Date(j.at) })).filter(j => j.d.getTime() + 3600000 > now.getTime()).sort((a, b) => a.d - b.d).slice(0, 5);
+  const ul = $("#jlist"); ul.innerHTML = "";
+  up.forEach((j, i) => {
+    const n = dayDiff(j.d, now);
+    const dd = n <= 0 ? "오늘" : n === 1 ? "내일" : "D-" + n;
+    const hh = String(j.d.getHours()).padStart(2, "0") + ":" + String(j.d.getMinutes()).padStart(2, "0");
+    const li = document.createElement("li");
+    li.className = "rise d" + Math.min(i + 1, 4);
+    li.innerHTML = '<div class="jd">' + (j.d.getMonth() + 1) + "." + String(j.d.getDate()).padStart(2, "0") +
+      "<small>" + WD[j.d.getDay()] + "요일 " + hh + "</small></div>" +
+      '<div class="jt"></div><span class="dd' + (n <= 1 ? " hot" : "") + '">' + dd + "</span>";
+    li.querySelector(".jt").textContent = j.title;
+    if (j.sub) { const s = document.createElement("small"); s.textContent = j.sub; li.querySelector(".jt").appendChild(s); }
+    ul.appendChild(li);
+  });
+  return up.length > 0;
+}
+
+/* QR */
+function buildQR() {
+  const items = [
+    { key: "site", main: true, title: "갓쌤연수원", desc: "가입하면 무료 연수와 뉴스레터를 받아요.", find: "", url: "godedu.co.kr" },
+    { key: "cafe", title: "연구회 카페", desc: "행사, 분과 연구 결과물, 공지를 모아 둬요.", find: "", url: "네이버 카페" },
+    { key: "chat", title: "무료 단톡방", desc: "AI무료 연수 & 실전 활용 꿀팁 단톡방이에요.", find: "", url: "카카오톡 오픈채팅" }
+  ];
+  const box = $("#qrs"); box.innerHTML = "";
+  const shown = items.filter(it => !(it.key === "chat" && hidden.includes("chat")));
+  box.style.gridTemplateColumns = "repeat(" + shown.length + ", minmax(0, 1fr))";
+  shown.forEach((it, i) => {
+    const c = document.createElement("div");
+    c.className = "qcard rise d" + (i + 2) + (it.main ? " main" : "");
+    const link = LINKS[it.key];
+    const q = document.createElement("div");
+    if (QR_IMG[it.key]) {
+      q.className = "qbox"; q.appendChild(qrImg(it.key, 172));
+    } else if (link && window.QRCode) {
+      q.className = "qbox";
+      new QRCode(q, { text: link, width: 172, height: 172, colorDark: "#0f1830", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+    } else {
+      q.className = "qbox find";
+      q.innerHTML = it.find || "";
+    }
+    const t = document.createElement("div");
+    t.innerHTML = "<h3></h3><p></p>";
+    t.querySelector("h3").textContent = it.title;
+    t.querySelector("p").textContent = it.desc;
+    if (it.url) { const u = document.createElement("span"); u.className = "url"; u.textContent = it.url; t.appendChild(u); }
+    c.append(q, t); box.appendChild(c);
+  });
+}
+
+function buildBigQR() {
+  document.querySelectorAll("[data-qr]").forEach(el => {
+    const link = LINKS[el.dataset.qr];
+    el.innerHTML = "";
+    if (QR_IMG[el.dataset.qr]) el.appendChild(qrImg(el.dataset.qr, el.classList.contains("qbox") ? 172 : 288));
+    else if (link && window.QRCode) new QRCode(el, { text: link, width: 288, height: 288, colorDark: "#0f1830", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.L });
+  });
+}
+
+const QR_IMG = {"chat": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyOSAyOSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj48cmVjdCB3aWR0aD0iMjkiIGhlaWdodD0iMjkiIGZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjMGYxODMwIiBkPSJNMCAwaDF2MWgtMXpNMSAwaDF2MWgtMXpNMiAwaDF2MWgtMXpNMyAwaDF2MWgtMXpNNCAwaDF2MWgtMXpNNSAwaDF2MWgtMXpNNiAwaDF2MWgtMXpNMTEgMGgxdjFoLTF6TTEyIDBoMXYxaC0xek0xNCAwaDF2MWgtMXpNMTcgMGgxdjFoLTF6TTE4IDBoMXYxaC0xek0xOSAwaDF2MWgtMXpNMjAgMGgxdjFoLTF6TTIyIDBoMXYxaC0xek0yMyAwaDF2MWgtMXpNMjQgMGgxdjFoLTF6TTI1IDBoMXYxaC0xek0yNiAwaDF2MWgtMXpNMjcgMGgxdjFoLTF6TTI4IDBoMXYxaC0xek0wIDFoMXYxaC0xek02IDFoMXYxaC0xek0xMiAxaDF2MWgtMXpNMTYgMWgxdjFoLTF6TTE4IDFoMXYxaC0xek0yMCAxaDF2MWgtMXpNMjIgMWgxdjFoLTF6TTI4IDFoMXYxaC0xek0wIDJoMXYxaC0xek0yIDJoMXYxaC0xek0zIDJoMXYxaC0xek00IDJoMXYxaC0xek02IDJoMXYxaC0xek05IDJoMXYxaC0xek0xMCAyaDF2MWgtMXpNMTQgMmgxdjFoLTF6TTE1IDJoMXYxaC0xek0xNyAyaDF2MWgtMXpNMjAgMmgxdjFoLTF6TTIyIDJoMXYxaC0xek0yNCAyaDF2MWgtMXpNMjUgMmgxdjFoLTF6TTI2IDJoMXYxaC0xek0yOCAyaDF2MWgtMXpNMCAzaDF2MWgtMXpNMiAzaDF2MWgtMXpNMyAzaDF2MWgtMXpNNCAzaDF2MWgtMXpNNiAzaDF2MWgtMXpNOSAzaDF2MWgtMXpNMTAgM2gxdjFoLTF6TTEyIDNoMXYxaC0xek0xMyAzaDF2MWgtMXpNMTYgM2gxdjFoLTF6TTE4IDNoMXYxaC0xek0yMiAzaDF2MWgtMXpNMjQgM2gxdjFoLTF6TTI1IDNoMXYxaC0xek0yNiAzaDF2MWgtMXpNMjggM2gxdjFoLTF6TTAgNGgxdjFoLTF6TTIgNGgxdjFoLTF6TTMgNGgxdjFoLTF6TTQgNGgxdjFoLTF6TTYgNGgxdjFoLTF6TTkgNGgxdjFoLTF6TTEwIDRoMXYxaC0xek0xMSA0aDF2MWgtMXpNMTcgNGgxdjFoLTF6TTE4IDRoMXYxaC0xek0yMiA0aDF2MWgtMXpNMjQgNGgxdjFoLTF6TTI1IDRoMXYxaC0xek0yNiA0aDF2MWgtMXpNMjggNGgxdjFoLTF6TTAgNWgxdjFoLTF6TTYgNWgxdjFoLTF6TTggNWgxdjFoLTF6TTExIDVoMXYxaC0xek0xNSA1aDF2MWgtMXpNMTYgNWgxdjFoLTF6TTE3IDVoMXYxaC0xek0xOCA1aDF2MWgtMXpNMTkgNWgxdjFoLTF6TTIyIDVoMXYxaC0xek0yOCA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNMSA2aDF2MWgtMXpNMiA2aDF2MWgtMXpNMyA2aDF2MWgtMXpNNCA2aDF2MWgtMXpNNSA2aDF2MWgtMXpNNiA2aDF2MWgtMXpNOCA2aDF2MWgtMXpNMTAgNmgxdjFoLTF6TTEyIDZoMXYxaC0xek0xNCA2aDF2MWgtMXpNMTYgNmgxdjFoLTF6TTE4IDZoMXYxaC0xek0yMCA2aDF2MWgtMXpNMjIgNmgxdjFoLTF6TTIzIDZoMXYxaC0xek0yNCA2aDF2MWgtMXpNMjUgNmgxdjFoLTF6TTI2IDZoMXYxaC0xek0yNyA2aDF2MWgtMXpNMjggNmgxdjFoLTF6TTExIDdoMXYxaC0xek0xMyA3aDF2MWgtMXpNMTUgN2gxdjFoLTF6TTE2IDdoMXYxaC0xek0xNyA3aDF2MWgtMXpNMTggN2gxdjFoLTF6TTE5IDdoMXYxaC0xek0yMCA3aDF2MWgtMXpNMCA4aDF2MWgtMXpNMyA4aDF2MWgtMXpNNSA4aDF2MWgtMXpNNiA4aDF2MWgtMXpNOCA4aDF2MWgtMXpNOSA4aDF2MWgtMXpNMTEgOGgxdjFoLTF6TTEyIDhoMXYxaC0xek0xNCA4aDF2MWgtMXpNMTYgOGgxdjFoLTF6TTE4IDhoMXYxaC0xek0xOSA4aDF2MWgtMXpNMjEgOGgxdjFoLTF6TTIzIDhoMXYxaC0xek0wIDloMXYxaC0xek0xIDloMXYxaC0xek0yIDloMXYxaC0xek0zIDloMXYxaC0xek01IDloMXYxaC0xek04IDloMXYxaC0xek0xMyA5aDF2MWgtMXpNMTUgOWgxdjFoLTF6TTE2IDloMXYxaC0xek0yMCA5aDF2MWgtMXpNMjEgOWgxdjFoLTF6TTIyIDloMXYxaC0xek0yMyA5aDF2MWgtMXpNMjUgOWgxdjFoLTF6TTI4IDloMXYxaC0xek0zIDEwaDF2MWgtMXpNNCAxMGgxdjFoLTF6TTUgMTBoMXYxaC0xek02IDEwaDF2MWgtMXpNOCAxMGgxdjFoLTF6TTkgMTBoMXYxaC0xek0xMCAxMGgxdjFoLTF6TTExIDEwaDF2MWgtMXpNMTMgMTBoMXYxaC0xek0xNCAxMGgxdjFoLTF6TTE1IDEwaDF2MWgtMXpNMTcgMTBoMXYxaC0xek0xOSAxMGgxdjFoLTF6TTIxIDEwaDF2MWgtMXpNMjIgMTBoMXYxaC0xek0yNSAxMGgxdjFoLTF6TTI2IDEwaDF2MWgtMXpNMjcgMTBoMXYxaC0xek0wIDExaDF2MWgtMXpNMSAxMWgxdjFoLTF6TTIgMTFoMXYxaC0xek00IDExaDF2MWgtMXpNNSAxMWgxdjFoLTF6TTcgMTFoMXYxaC0xek04IDExaDF2MWgtMXpNMTAgMTFoMXYxaC0xek0xMiAxMWgxdjFoLTF6TTEzIDExaDF2MWgtMXpNMTYgMTFoMXYxaC0xek0xOCAxMWgxdjFoLTF6TTIwIDExaDF2MWgtMXpNMjEgMTFoMXYxaC0xek0yMiAxMWgxdjFoLTF6TTIzIDExaDF2MWgtMXpNMjQgMTFoMXYxaC0xek0yNiAxMWgxdjFoLTF6TTI3IDExaDF2MWgtMXpNMSAxMmgxdjFoLTF6TTIgMTJoMXYxaC0xek0zIDEyaDF2MWgtMXpNNCAxMmgxdjFoLTF6TTUgMTJoMXYxaC0xek02IDEyaDF2MWgtMXpNNyAxMmgxdjFoLTF6TTkgMTJoMXYxaC0xek0xMCAxMmgxdjFoLTF6TTE0IDEyaDF2MWgtMXpNMTUgMTJoMXYxaC0xek0xNiAxMmgxdjFoLTF6TTE3IDEyaDF2MWgtMXpNMjAgMTJoMXYxaC0xek0yMSAxMmgxdjFoLTF6TTIyIDEyaDF2MWgtMXpNMjUgMTJoMXYxaC0xek0yNyAxMmgxdjFoLTF6TTI4IDEyaDF2MWgtMXpNMyAxM2gxdjFoLTF6TTQgMTNoMXYxaC0xek01IDEzaDF2MWgtMXpNNyAxM2gxdjFoLTF6TTggMTNoMXYxaC0xek05IDEzaDF2MWgtMXpNMTEgMTNoMXYxaC0xek0xMyAxM2gxdjFoLTF6TTE0IDEzaDF2MWgtMXpNMTUgMTNoMXYxaC0xek0xNiAxM2gxdjFoLTF6TTE3IDEzaDF2MWgtMXpNMTkgMTNoMXYxaC0xek0yMCAxM2gxdjFoLTF6TTIxIDEzaDF2MWgtMXpNMCAxNGgxdjFoLTF6TTMgMTRoMXYxaC0xek02IDE0aDF2MWgtMXpNNyAxNGgxdjFoLTF6TTkgMTRoMXYxaC0xek0xMSAxNGgxdjFoLTF6TTEzIDE0aDF2MWgtMXpNMTQgMTRoMXYxaC0xek0yNCAxNGgxdjFoLTF6TTI1IDE0aDF2MWgtMXpNMjYgMTRoMXYxaC0xek0yNyAxNGgxdjFoLTF6TTI4IDE0aDF2MWgtMXpNMCAxNWgxdjFoLTF6TTIgMTVoMXYxaC0xek0zIDE1aDF2MWgtMXpNNSAxNWgxdjFoLTF6TTcgMTVoMXYxaC0xek04IDE1aDF2MWgtMXpNOSAxNWgxdjFoLTF6TTEwIDE1aDF2MWgtMXpNMTEgMTVoMXYxaC0xek0xMiAxNWgxdjFoLTF6TTE1IDE1aDF2MWgtMXpNMTcgMTVoMXYxaC0xek0xOCAxNWgxdjFoLTF6TTIwIDE1aDF2MWgtMXpNMjIgMTVoMXYxaC0xek0yNSAxNWgxdjFoLTF6TTI3IDE1aDF2MWgtMXpNMCAxNmgxdjFoLTF6TTEgMTZoMXYxaC0xek0yIDE2aDF2MWgtMXpNMyAxNmgxdjFoLTF6TTUgMTZoMXYxaC0xek02IDE2aDF2MWgtMXpNOCAxNmgxdjFoLTF6TTkgMTZoMXYxaC0xek0xMSAxNmgxdjFoLTF6TTEyIDE2aDF2MWgtMXpNMTMgMTZoMXYxaC0xek0xNSAxNmgxdjFoLTF6TTE3IDE2aDF2MWgtMXpNMjAgMTZoMXYxaC0xek0yMSAxNmgxdjFoLTF6TTI3IDE2aDF2MWgtMXpNMSAxN2gxdjFoLTF6TTQgMTdoMXYxaC0xek01IDE3aDF2MWgtMXpNNyAxN2gxdjFoLTF6TTkgMTdoMXYxaC0xek0xMSAxN2gxdjFoLTF6TTEyIDE3aDF2MWgtMXpNMTMgMTdoMXYxaC0xek0xNCAxN2gxdjFoLTF6TTE2IDE3aDF2MWgtMXpNMTcgMTdoMXYxaC0xek0yMCAxN2gxdjFoLTF6TTIxIDE3aDF2MWgtMXpNMjIgMTdoMXYxaC0xek0yMyAxN2gxdjFoLTF6TTI1IDE3aDF2MWgtMXpNMjggMTdoMXYxaC0xek0wIDE4aDF2MWgtMXpNMiAxOGgxdjFoLTF6TTMgMThoMXYxaC0xek00IDE4aDF2MWgtMXpNNiAxOGgxdjFoLTF6TTggMThoMXYxaC0xek0xMCAxOGgxdjFoLTF6TTE0IDE4aDF2MWgtMXpNMTcgMThoMXYxaC0xek0xOCAxOGgxdjFoLTF6TTIyIDE4aDF2MWgtMXpNMjQgMThoMXYxaC0xek0yNyAxOGgxdjFoLTF6TTI4IDE4aDF2MWgtMXpNMyAxOWgxdjFoLTF6TTQgMTloMXYxaC0xek0xMSAxOWgxdjFoLTF6TTE0IDE5aDF2MWgtMXpNMTUgMTloMXYxaC0xek0xNiAxOWgxdjFoLTF6TTE3IDE5aDF2MWgtMXpNMTkgMTloMXYxaC0xek0yMCAxOWgxdjFoLTF6TTIyIDE5aDF2MWgtMXpNMjMgMTloMXYxaC0xek0yNyAxOWgxdjFoLTF6TTI4IDE5aDF2MWgtMXpNMCAyMGgxdjFoLTF6TTIgMjBoMXYxaC0xek0zIDIwaDF2MWgtMXpNNSAyMGgxdjFoLTF6TTYgMjBoMXYxaC0xek05IDIwaDF2MWgtMXpNMTAgMjBoMXYxaC0xek0xMSAyMGgxdjFoLTF6TTE4IDIwaDF2MWgtMXpNMTkgMjBoMXYxaC0xek0yMCAyMGgxdjFoLTF6TTIxIDIwaDF2MWgtMXpNMjIgMjBoMXYxaC0xek0yMyAyMGgxdjFoLTF6TTI0IDIwaDF2MWgtMXpNMjYgMjBoMXYxaC0xek04IDIxaDF2MWgtMXpNMTEgMjFoMXYxaC0xek0xMiAyMWgxdjFoLTF6TTE0IDIxaDF2MWgtMXpNMTYgMjFoMXYxaC0xek0xNyAyMWgxdjFoLTF6TTE4IDIxaDF2MWgtMXpNMTkgMjFoMXYxaC0xek0yMCAyMWgxdjFoLTF6TTI0IDIxaDF2MWgtMXpNMjYgMjFoMXYxaC0xek0yNyAyMWgxdjFoLTF6TTI4IDIxaDF2MWgtMXpNMCAyMmgxdjFoLTF6TTEgMjJoMXYxaC0xek0yIDIyaDF2MWgtMXpNMyAyMmgxdjFoLTF6TTQgMjJoMXYxaC0xek01IDIyaDF2MWgtMXpNNiAyMmgxdjFoLTF6TTExIDIyaDF2MWgtMXpNMTIgMjJoMXYxaC0xek0xNiAyMmgxdjFoLTF6TTE3IDIyaDF2MWgtMXpNMjAgMjJoMXYxaC0xek0yMiAyMmgxdjFoLTF6TTI0IDIyaDF2MWgtMXpNMjcgMjJoMXYxaC0xek0wIDIzaDF2MWgtMXpNNiAyM2gxdjFoLTF6TTggMjNoMXYxaC0xek05IDIzaDF2MWgtMXpNMTEgMjNoMXYxaC0xek0xNCAyM2gxdjFoLTF6TTIwIDIzaDF2MWgtMXpNMjQgMjNoMXYxaC0xek0yNSAyM2gxdjFoLTF6TTI2IDIzaDF2MWgtMXpNMCAyNGgxdjFoLTF6TTIgMjRoMXYxaC0xek0zIDI0aDF2MWgtMXpNNCAyNGgxdjFoLTF6TTYgMjRoMXYxaC0xek05IDI0aDF2MWgtMXpNMTYgMjRoMXYxaC0xek0xNyAyNGgxdjFoLTF6TTE4IDI0aDF2MWgtMXpNMjAgMjRoMXYxaC0xek0yMSAyNGgxdjFoLTF6TTIyIDI0aDF2MWgtMXpNMjMgMjRoMXYxaC0xek0yNCAyNGgxdjFoLTF6TTI4IDI0aDF2MWgtMXpNMCAyNWgxdjFoLTF6TTIgMjVoMXYxaC0xek0zIDI1aDF2MWgtMXpNNCAyNWgxdjFoLTF6TTYgMjVoMXYxaC0xek04IDI1aDF2MWgtMXpNOSAyNWgxdjFoLTF6TTEyIDI1aDF2MWgtMXpNMTMgMjVoMXYxaC0xek0xNyAyNWgxdjFoLTF6TTE4IDI1aDF2MWgtMXpNMTkgMjVoMXYxaC0xek0yMiAyNWgxdjFoLTF6TTI0IDI1aDF2MWgtMXpNMjUgMjVoMXYxaC0xek0yNiAyNWgxdjFoLTF6TTI3IDI1aDF2MWgtMXpNMCAyNmgxdjFoLTF6TTIgMjZoMXYxaC0xek0zIDI2aDF2MWgtMXpNNCAyNmgxdjFoLTF6TTYgMjZoMXYxaC0xek0xMSAyNmgxdjFoLTF6TTEyIDI2aDF2MWgtMXpNMTMgMjZoMXYxaC0xek0xNyAyNmgxdjFoLTF6TTE4IDI2aDF2MWgtMXpNMjQgMjZoMXYxaC0xek0yNSAyNmgxdjFoLTF6TTI2IDI2aDF2MWgtMXpNMjggMjZoMXYxaC0xek0wIDI3aDF2MWgtMXpNNiAyN2gxdjFoLTF6TTkgMjdoMXYxaC0xek0xMCAyN2gxdjFoLTF6TTExIDI3aDF2MWgtMXpNMTIgMjdoMXYxaC0xek0xNCAyN2gxdjFoLTF6TTE1IDI3aDF2MWgtMXpNMTcgMjdoMXYxaC0xek0xOSAyN2gxdjFoLTF6TTIwIDI3aDF2MWgtMXpNMjEgMjdoMXYxaC0xek0yMiAyN2gxdjFoLTF6TTI0IDI3aDF2MWgtMXpNMjcgMjdoMXYxaC0xek0wIDI4aDF2MWgtMXpNMSAyOGgxdjFoLTF6TTIgMjhoMXYxaC0xek0zIDI4aDF2MWgtMXpNNCAyOGgxdjFoLTF6TTUgMjhoMXYxaC0xek02IDI4aDF2MWgtMXpNOCAyOGgxdjFoLTF6TTkgMjhoMXYxaC0xek0xMCAyOGgxdjFoLTF6TTE0IDI4aDF2MWgtMXpNMTYgMjhoMXYxaC0xek0xNyAyOGgxdjFoLTF6TTIwIDI4aDF2MWgtMXpNMjEgMjhoMXYxaC0xek0yMiAyOGgxdjFoLTF6TTIzIDI4aDF2MWgtMXpNMjUgMjhoMXYxaC0xek0yNyAyOGgxdjFoLTF6Ii8+PC9zdmc+", "contest": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj48cmVjdCB3aWR0aD0iMzMiIGhlaWdodD0iMzMiIGZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjMGYxODMwIiBkPSJNMCAwaDF2MWgtMXpNMSAwaDF2MWgtMXpNMiAwaDF2MWgtMXpNMyAwaDF2MWgtMXpNNCAwaDF2MWgtMXpNNSAwaDF2MWgtMXpNNiAwaDF2MWgtMXpNOSAwaDF2MWgtMXpNMTAgMGgxdjFoLTF6TTExIDBoMXYxaC0xek0xMiAwaDF2MWgtMXpNMTggMGgxdjFoLTF6TTE5IDBoMXYxaC0xek0yMiAwaDF2MWgtMXpNMjMgMGgxdjFoLTF6TTI2IDBoMXYxaC0xek0yNyAwaDF2MWgtMXpNMjggMGgxdjFoLTF6TTI5IDBoMXYxaC0xek0zMCAwaDF2MWgtMXpNMzEgMGgxdjFoLTF6TTMyIDBoMXYxaC0xek0wIDFoMXYxaC0xek02IDFoMXYxaC0xek0xMCAxaDF2MWgtMXpNMTUgMWgxdjFoLTF6TTE4IDFoMXYxaC0xek0yMCAxaDF2MWgtMXpNMjEgMWgxdjFoLTF6TTI2IDFoMXYxaC0xek0zMiAxaDF2MWgtMXpNMCAyaDF2MWgtMXpNMiAyaDF2MWgtMXpNMyAyaDF2MWgtMXpNNCAyaDF2MWgtMXpNNiAyaDF2MWgtMXpNOCAyaDF2MWgtMXpNMTAgMmgxdjFoLTF6TTE0IDJoMXYxaC0xek0xNSAyaDF2MWgtMXpNMTYgMmgxdjFoLTF6TTE5IDJoMXYxaC0xek0yMCAyaDF2MWgtMXpNMjEgMmgxdjFoLTF6TTIyIDJoMXYxaC0xek0yNiAyaDF2MWgtMXpNMjggMmgxdjFoLTF6TTI5IDJoMXYxaC0xek0zMCAyaDF2MWgtMXpNMzIgMmgxdjFoLTF6TTAgM2gxdjFoLTF6TTIgM2gxdjFoLTF6TTMgM2gxdjFoLTF6TTQgM2gxdjFoLTF6TTYgM2gxdjFoLTF6TTggM2gxdjFoLTF6TTEwIDNoMXYxaC0xek0xMiAzaDF2MWgtMXpNMTUgM2gxdjFoLTF6TTE4IDNoMXYxaC0xek0xOSAzaDF2MWgtMXpNMjYgM2gxdjFoLTF6TTI4IDNoMXYxaC0xek0yOSAzaDF2MWgtMXpNMzAgM2gxdjFoLTF6TTMyIDNoMXYxaC0xek0wIDRoMXYxaC0xek0yIDRoMXYxaC0xek0zIDRoMXYxaC0xek00IDRoMXYxaC0xek02IDRoMXYxaC0xek04IDRoMXYxaC0xek05IDRoMXYxaC0xek0xMiA0aDF2MWgtMXpNMTMgNGgxdjFoLTF6TTE0IDRoMXYxaC0xek0xNSA0aDF2MWgtMXpNMTYgNGgxdjFoLTF6TTE3IDRoMXYxaC0xek0yMCA0aDF2MWgtMXpNMjEgNGgxdjFoLTF6TTIzIDRoMXYxaC0xek0yNiA0aDF2MWgtMXpNMjggNGgxdjFoLTF6TTI5IDRoMXYxaC0xek0zMCA0aDF2MWgtMXpNMzIgNGgxdjFoLTF6TTAgNWgxdjFoLTF6TTYgNWgxdjFoLTF6TTggNWgxdjFoLTF6TTExIDVoMXYxaC0xek0xMyA1aDF2MWgtMXpNMTQgNWgxdjFoLTF6TTE3IDVoMXYxaC0xek0xOSA1aDF2MWgtMXpNMjQgNWgxdjFoLTF6TTI2IDVoMXYxaC0xek0zMiA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNMSA2aDF2MWgtMXpNMiA2aDF2MWgtMXpNMyA2aDF2MWgtMXpNNCA2aDF2MWgtMXpNNSA2aDF2MWgtMXpNNiA2aDF2MWgtMXpNOCA2aDF2MWgtMXpNMTAgNmgxdjFoLTF6TTEyIDZoMXYxaC0xek0xNCA2aDF2MWgtMXpNMTYgNmgxdjFoLTF6TTE4IDZoMXYxaC0xek0yMCA2aDF2MWgtMXpNMjIgNmgxdjFoLTF6TTI0IDZoMXYxaC0xek0yNiA2aDF2MWgtMXpNMjcgNmgxdjFoLTF6TTI4IDZoMXYxaC0xek0yOSA2aDF2MWgtMXpNMzAgNmgxdjFoLTF6TTMxIDZoMXYxaC0xek0zMiA2aDF2MWgtMXpNOCA3aDF2MWgtMXpNOSA3aDF2MWgtMXpNMTAgN2gxdjFoLTF6TTEyIDdoMXYxaC0xek0xNCA3aDF2MWgtMXpNMTYgN2gxdjFoLTF6TTE5IDdoMXYxaC0xek0yMCA3aDF2MWgtMXpNMjEgN2gxdjFoLTF6TTIyIDdoMXYxaC0xek0wIDhoMXYxaC0xek0yIDhoMXYxaC0xek0zIDhoMXYxaC0xek00IDhoMXYxaC0xek01IDhoMXYxaC0xek02IDhoMXYxaC0xek05IDhoMXYxaC0xek0xMCA4aDF2MWgtMXpNMTIgOGgxdjFoLTF6TTEzIDhoMXYxaC0xek0xNCA4aDF2MWgtMXpNMTYgOGgxdjFoLTF6TTE3IDhoMXYxaC0xek0xOSA4aDF2MWgtMXpNMjIgOGgxdjFoLTF6TTIzIDhoMXYxaC0xek0yNCA4aDF2MWgtMXpNMjYgOGgxdjFoLTF6TTI3IDhoMXYxaC0xek0yOCA4aDF2MWgtMXpNMjkgOGgxdjFoLTF6TTMwIDhoMXYxaC0xek0xIDloMXYxaC0xek0yIDloMXYxaC0xek0zIDloMXYxaC0xek03IDloMXYxaC0xek0xMiA5aDF2MWgtMXpNMTMgOWgxdjFoLTF6TTE2IDloMXYxaC0xek0xNyA5aDF2MWgtMXpNMTggOWgxdjFoLTF6TTE5IDloMXYxaC0xek0yMCA5aDF2MWgtMXpNMjIgOWgxdjFoLTF6TTIzIDloMXYxaC0xek0yNiA5aDF2MWgtMXpNMjcgOWgxdjFoLTF6TTI5IDloMXYxaC0xek0zMCA5aDF2MWgtMXpNMzIgOWgxdjFoLTF6TTAgMTBoMXYxaC0xek0yIDEwaDF2MWgtMXpNNCAxMGgxdjFoLTF6TTYgMTBoMXYxaC0xek05IDEwaDF2MWgtMXpNMTAgMTBoMXYxaC0xek0xMiAxMGgxdjFoLTF6TTEzIDEwaDF2MWgtMXpNMTQgMTBoMXYxaC0xek0xNSAxMGgxdjFoLTF6TTE2IDEwaDF2MWgtMXpNMTcgMTBoMXYxaC0xek0yMCAxMGgxdjFoLTF6TTIxIDEwaDF2MWgtMXpNMjIgMTBoMXYxaC0xek0yNCAxMGgxdjFoLTF6TTI1IDEwaDF2MWgtMXpNMjggMTBoMXYxaC0xek0zMCAxMGgxdjFoLTF6TTMxIDEwaDF2MWgtMXpNMSAxMWgxdjFoLTF6TTMgMTFoMXYxaC0xek01IDExaDF2MWgtMXpNNyAxMWgxdjFoLTF6TTggMTFoMXYxaC0xek05IDExaDF2MWgtMXpNMTAgMTFoMXYxaC0xek0xMyAxMWgxdjFoLTF6TTE3IDExaDF2MWgtMXpNMTggMTFoMXYxaC0xek0yMSAxMWgxdjFoLTF6TTIyIDExaDF2MWgtMXpNMjYgMTFoMXYxaC0xek0yOCAxMWgxdjFoLTF6TTI5IDExaDF2MWgtMXpNMzAgMTFoMXYxaC0xek0zMSAxMWgxdjFoLTF6TTEgMTJoMXYxaC0xek0yIDEyaDF2MWgtMXpNNiAxMmgxdjFoLTF6TTcgMTJoMXYxaC0xek04IDEyaDF2MWgtMXpNMTQgMTJoMXYxaC0xek0xNSAxMmgxdjFoLTF6TTE2IDEyaDF2MWgtMXpNMTkgMTJoMXYxaC0xek0yMiAxMmgxdjFoLTF6TTIzIDEyaDF2MWgtMXpNMjQgMTJoMXYxaC0xek0yOCAxMmgxdjFoLTF6TTI5IDEyaDF2MWgtMXpNMzEgMTJoMXYxaC0xek0zIDEzaDF2MWgtMXpNNCAxM2gxdjFoLTF6TTUgMTNoMXYxaC0xek03IDEzaDF2MWgtMXpNOSAxM2gxdjFoLTF6TTE1IDEzaDF2MWgtMXpNMTggMTNoMXYxaC0xek0yMSAxM2gxdjFoLTF6TTIzIDEzaDF2MWgtMXpNMjYgMTNoMXYxaC0xek0yNyAxM2gxdjFoLTF6TTMwIDEzaDF2MWgtMXpNMzEgMTNoMXYxaC0xek0zMiAxM2gxdjFoLTF6TTAgMTRoMXYxaC0xek0xIDE0aDF2MWgtMXpNMyAxNGgxdjFoLTF6TTYgMTRoMXYxaC0xek03IDE0aDF2MWgtMXpNOCAxNGgxdjFoLTF6TTkgMTRoMXYxaC0xek0xNCAxNGgxdjFoLTF6TTE1IDE0aDF2MWgtMXpNMTYgMTRoMXYxaC0xek0xNyAxNGgxdjFoLTF6TTE4IDE0aDF2MWgtMXpNMjAgMTRoMXYxaC0xek0yMSAxNGgxdjFoLTF6TTI0IDE0aDF2MWgtMXpNMjUgMTRoMXYxaC0xek0yNiAxNGgxdjFoLTF6TTI3IDE0aDF2MWgtMXpNMjggMTRoMXYxaC0xek0yOSAxNGgxdjFoLTF6TTMxIDE0aDF2MWgtMXpNMCAxNWgxdjFoLTF6TTcgMTVoMXYxaC0xek0xMCAxNWgxdjFoLTF6TTExIDE1aDF2MWgtMXpNMTMgMTVoMXYxaC0xek0xNCAxNWgxdjFoLTF6TTE1IDE1aDF2MWgtMXpNMjEgMTVoMXYxaC0xek0yNCAxNWgxdjFoLTF6TTI1IDE1aDF2MWgtMXpNMjYgMTVoMXYxaC0xek0yNyAxNWgxdjFoLTF6TTMwIDE1aDF2MWgtMXpNMCAxNmgxdjFoLTF6TTIgMTZoMXYxaC0xek0zIDE2aDF2MWgtMXpNNSAxNmgxdjFoLTF6TTYgMTZoMXYxaC0xek05IDE2aDF2MWgtMXpNMTAgMTZoMXYxaC0xek0xMiAxNmgxdjFoLTF6TTEzIDE2aDF2MWgtMXpNMTQgMTZoMXYxaC0xek0xNSAxNmgxdjFoLTF6TTE2IDE2aDF2MWgtMXpNMTcgMTZoMXYxaC0xek0xOSAxNmgxdjFoLTF6TTIyIDE2aDF2MWgtMXpNMjQgMTZoMXYxaC0xek0yNSAxNmgxdjFoLTF6TTI3IDE2aDF2MWgtMXpNMjggMTZoMXYxaC0xek0zMiAxNmgxdjFoLTF6TTAgMTdoMXYxaC0xek0xIDE3aDF2MWgtMXpNNCAxN2gxdjFoLTF6TTUgMTdoMXYxaC0xek0xMCAxN2gxdjFoLTF6TTExIDE3aDF2MWgtMXpNMTIgMTdoMXYxaC0xek0xNiAxN2gxdjFoLTF6TTE4IDE3aDF2MWgtMXpNMTkgMTdoMXYxaC0xek0yMCAxN2gxdjFoLTF6TTIxIDE3aDF2MWgtMXpNMjMgMTdoMXYxaC0xek0yNSAxN2gxdjFoLTF6TTI2IDE3aDF2MWgtMXpNMjcgMTdoMXYxaC0xek0yOSAxN2gxdjFoLTF6TTMwIDE3aDF2MWgtMXpNMzIgMTdoMXYxaC0xek0wIDE4aDF2MWgtMXpNMyAxOGgxdjFoLTF6TTQgMThoMXYxaC0xek02IDE4aDF2MWgtMXpNMTAgMThoMXYxaC0xek0xMSAxOGgxdjFoLTF6TTEyIDE4aDF2MWgtMXpNMTMgMThoMXYxaC0xek0xNCAxOGgxdjFoLTF6TTE1IDE4aDF2MWgtMXpNMTYgMThoMXYxaC0xek0xOCAxOGgxdjFoLTF6TTIxIDE4aDF2MWgtMXpNMjIgMThoMXYxaC0xek0yNyAxOGgxdjFoLTF6TTI4IDE4aDF2MWgtMXpNMzAgMThoMXYxaC0xek0zMSAxOGgxdjFoLTF6TTAgMTloMXYxaC0xek0zIDE5aDF2MWgtMXpNNCAxOWgxdjFoLTF6TTkgMTloMXYxaC0xek0xMCAxOWgxdjFoLTF6TTEyIDE5aDF2MWgtMXpNMTMgMTloMXYxaC0xek0xNCAxOWgxdjFoLTF6TTE1IDE5aDF2MWgtMXpNMTYgMTloMXYxaC0xek0xOSAxOWgxdjFoLTF6TTIwIDE5aDF2MWgtMXpNMjEgMTloMXYxaC0xek0yMiAxOWgxdjFoLTF6TTI0IDE5aDF2MWgtMXpNMjUgMTloMXYxaC0xek0yNiAxOWgxdjFoLTF6TTI3IDE5aDF2MWgtMXpNMjggMTloMXYxaC0xek0yOSAxOWgxdjFoLTF6TTMwIDE5aDF2MWgtMXpNMzEgMTloMXYxaC0xek0zMiAxOWgxdjFoLTF6TTEgMjBoMXYxaC0xek0yIDIwaDF2MWgtMXpNMyAyMGgxdjFoLTF6TTQgMjBoMXYxaC0xek02IDIwaDF2MWgtMXpNNyAyMGgxdjFoLTF6TTggMjBoMXYxaC0xek05IDIwaDF2MWgtMXpNMTEgMjBoMXYxaC0xek0xMiAyMGgxdjFoLTF6TTEzIDIwaDF2MWgtMXpNMTQgMjBoMXYxaC0xek0xNSAyMGgxdjFoLTF6TTE4IDIwaDF2MWgtMXpNMTkgMjBoMXYxaC0xek0yMCAyMGgxdjFoLTF6TTIyIDIwaDF2MWgtMXpNMjUgMjBoMXYxaC0xek0yOCAyMGgxdjFoLTF6TTI5IDIwaDF2MWgtMXpNMzEgMjBoMXYxaC0xek0wIDIxaDF2MWgtMXpNMyAyMWgxdjFoLTF6TTQgMjFoMXYxaC0xek04IDIxaDF2MWgtMXpNMTAgMjFoMXYxaC0xek0xMSAyMWgxdjFoLTF6TTE0IDIxaDF2MWgtMXpNMTUgMjFoMXYxaC0xek0xNiAyMWgxdjFoLTF6TTE3IDIxaDF2MWgtMXpNMTkgMjFoMXYxaC0xek0yMCAyMWgxdjFoLTF6TTIxIDIxaDF2MWgtMXpNMjMgMjFoMXYxaC0xek0yNiAyMWgxdjFoLTF6TTI3IDIxaDF2MWgtMXpNMjkgMjFoMXYxaC0xek0zMiAyMWgxdjFoLTF6TTAgMjJoMXYxaC0xek0zIDIyaDF2MWgtMXpNNiAyMmgxdjFoLTF6TTggMjJoMXYxaC0xek05IDIyaDF2MWgtMXpNMTEgMjJoMXYxaC0xek0xMiAyMmgxdjFoLTF6TTE0IDIyaDF2MWgtMXpNMTcgMjJoMXYxaC0xek0yMSAyMmgxdjFoLTF6TTI0IDIyaDF2MWgtMXpNMjUgMjJoMXYxaC0xek0yNyAyMmgxdjFoLTF6TTI5IDIyaDF2MWgtMXpNMzEgMjJoMXYxaC0xek0wIDIzaDF2MWgtMXpNNCAyM2gxdjFoLTF6TTkgMjNoMXYxaC0xek0xNiAyM2gxdjFoLTF6TTE5IDIzaDF2MWgtMXpNMjEgMjNoMXYxaC0xek0yMiAyM2gxdjFoLTF6TTI0IDIzaDF2MWgtMXpNMjUgMjNoMXYxaC0xek0yNiAyM2gxdjFoLTF6TTI3IDIzaDF2MWgtMXpNMzAgMjNoMXYxaC0xek0zMSAyM2gxdjFoLTF6TTMyIDIzaDF2MWgtMXpNMCAyNGgxdjFoLTF6TTIgMjRoMXYxaC0xek0zIDI0aDF2MWgtMXpNNiAyNGgxdjFoLTF6TTggMjRoMXYxaC0xek05IDI0aDF2MWgtMXpNMTEgMjRoMXYxaC0xek0xMiAyNGgxdjFoLTF6TTE0IDI0aDF2MWgtMXpNMTcgMjRoMXYxaC0xek0yMiAyNGgxdjFoLTF6TTI0IDI0aDF2MWgtMXpNMjUgMjRoMXYxaC0xek0yNiAyNGgxdjFoLTF6TTI3IDI0aDF2MWgtMXpNMjggMjRoMXYxaC0xek0yOSAyNGgxdjFoLTF6TTggMjVoMXYxaC0xek0xMSAyNWgxdjFoLTF6TTEyIDI1aDF2MWgtMXpNMTYgMjVoMXYxaC0xek0xNyAyNWgxdjFoLTF6TTE4IDI1aDF2MWgtMXpNMTkgMjVoMXYxaC0xek0yNCAyNWgxdjFoLTF6TTI4IDI1aDF2MWgtMXpNMzAgMjVoMXYxaC0xek0zMSAyNWgxdjFoLTF6TTMyIDI1aDF2MWgtMXpNMCAyNmgxdjFoLTF6TTEgMjZoMXYxaC0xek0yIDI2aDF2MWgtMXpNMyAyNmgxdjFoLTF6TTQgMjZoMXYxaC0xek01IDI2aDF2MWgtMXpNNiAyNmgxdjFoLTF6TTEwIDI2aDF2MWgtMXpNMTUgMjZoMXYxaC0xek0xNyAyNmgxdjFoLTF6TTIwIDI2aDF2MWgtMXpNMjIgMjZoMXYxaC0xek0yMyAyNmgxdjFoLTF6TTI0IDI2aDF2MWgtMXpNMjYgMjZoMXYxaC0xek0yOCAyNmgxdjFoLTF6TTMwIDI2aDF2MWgtMXpNMzEgMjZoMXYxaC0xek0wIDI3aDF2MWgtMXpNNiAyN2gxdjFoLTF6TTggMjdoMXYxaC0xek05IDI3aDF2MWgtMXpNMTAgMjdoMXYxaC0xek0xMSAyN2gxdjFoLTF6TTE1IDI3aDF2MWgtMXpNMTYgMjdoMXYxaC0xek0xNyAyN2gxdjFoLTF6TTE4IDI3aDF2MWgtMXpNMjAgMjdoMXYxaC0xek0yMSAyN2gxdjFoLTF6TTIzIDI3aDF2MWgtMXpNMjQgMjdoMXYxaC0xek0yOCAyN2gxdjFoLTF6TTI5IDI3aDF2MWgtMXpNMzAgMjdoMXYxaC0xek0zMiAyN2gxdjFoLTF6TTAgMjhoMXYxaC0xek0yIDI4aDF2MWgtMXpNMyAyOGgxdjFoLTF6TTQgMjhoMXYxaC0xek02IDI4aDF2MWgtMXpNOCAyOGgxdjFoLTF6TTEwIDI4aDF2MWgtMXpNMTEgMjhoMXYxaC0xek0xMiAyOGgxdjFoLTF6TTEzIDI4aDF2MWgtMXpNMTUgMjhoMXYxaC0xek0xNiAyOGgxdjFoLTF6TTIwIDI4aDF2MWgtMXpNMjIgMjhoMXYxaC0xek0yNCAyOGgxdjFoLTF6TTI1IDI4aDF2MWgtMXpNMjYgMjhoMXYxaC0xek0yNyAyOGgxdjFoLTF6TTI4IDI4aDF2MWgtMXpNMjkgMjhoMXYxaC0xek0zMSAyOGgxdjFoLTF6TTMyIDI4aDF2MWgtMXpNMCAyOWgxdjFoLTF6TTIgMjloMXYxaC0xek0zIDI5aDF2MWgtMXpNNCAyOWgxdjFoLTF6TTYgMjloMXYxaC0xek04IDI5aDF2MWgtMXpNOSAyOWgxdjFoLTF6TTEwIDI5aDF2MWgtMXpNMTMgMjloMXYxaC0xek0xNSAyOWgxdjFoLTF6TTE3IDI5aDF2MWgtMXpNMTggMjloMXYxaC0xek0xOSAyOWgxdjFoLTF6TTIwIDI5aDF2MWgtMXpNMjEgMjloMXYxaC0xek0yMiAyOWgxdjFoLTF6TTI0IDI5aDF2MWgtMXpNMjUgMjloMXYxaC0xek0yOCAyOWgxdjFoLTF6TTMwIDI5aDF2MWgtMXpNMzEgMjloMXYxaC0xek0zMiAyOWgxdjFoLTF6TTAgMzBoMXYxaC0xek0yIDMwaDF2MWgtMXpNMyAzMGgxdjFoLTF6TTQgMzBoMXYxaC0xek02IDMwaDF2MWgtMXpNOCAzMGgxdjFoLTF6TTkgMzBoMXYxaC0xek0xMCAzMGgxdjFoLTF6TTExIDMwaDF2MWgtMXpNMTIgMzBoMXYxaC0xek0xMyAzMGgxdjFoLTF6TTE1IDMwaDF2MWgtMXpNMTYgMzBoMXYxaC0xek0xNyAzMGgxdjFoLTF6TTI2IDMwaDF2MWgtMXpNMjcgMzBoMXYxaC0xek0wIDMxaDF2MWgtMXpNNiAzMWgxdjFoLTF6TTE0IDMxaDF2MWgtMXpNMTUgMzFoMXYxaC0xek0xOCAzMWgxdjFoLTF6TTIwIDMxaDF2MWgtMXpNMjEgMzFoMXYxaC0xek0yMiAzMWgxdjFoLTF6TTIzIDMxaDF2MWgtMXpNMjggMzFoMXYxaC0xek0zMCAzMWgxdjFoLTF6TTAgMzJoMXYxaC0xek0xIDMyaDF2MWgtMXpNMiAzMmgxdjFoLTF6TTMgMzJoMXYxaC0xek00IDMyaDF2MWgtMXpNNSAzMmgxdjFoLTF6TTYgMzJoMXYxaC0xek04IDMyaDF2MWgtMXpNMTAgMzJoMXYxaC0xek0xMSAzMmgxdjFoLTF6TTEyIDMyaDF2MWgtMXpNMTMgMzJoMXYxaC0xek0xNSAzMmgxdjFoLTF6TTE2IDMyaDF2MWgtMXpNMTcgMzJoMXYxaC0xek0yMiAzMmgxdjFoLTF6TTIzIDMyaDF2MWgtMXpNMjQgMzJoMXYxaC0xek0yNSAzMmgxdjFoLTF6TTI3IDMyaDF2MWgtMXpNMjkgMzJoMXYxaC0xek0zMSAzMmgxdjFoLTF6Ii8+PC9zdmc+", "cafe": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMyAzMyIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj48cmVjdCB3aWR0aD0iMzMiIGhlaWdodD0iMzMiIGZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjMGYxODMwIiBkPSJNMCAwaDF2MWgtMXpNMSAwaDF2MWgtMXpNMiAwaDF2MWgtMXpNMyAwaDF2MWgtMXpNNCAwaDF2MWgtMXpNNSAwaDF2MWgtMXpNNiAwaDF2MWgtMXpNMTAgMGgxdjFoLTF6TTExIDBoMXYxaC0xek0xMyAwaDF2MWgtMXpNMTQgMGgxdjFoLTF6TTE2IDBoMXYxaC0xek0xNyAwaDF2MWgtMXpNMTggMGgxdjFoLTF6TTE5IDBoMXYxaC0xek0yMCAwaDF2MWgtMXpNMjEgMGgxdjFoLTF6TTIzIDBoMXYxaC0xek0yNiAwaDF2MWgtMXpNMjcgMGgxdjFoLTF6TTI4IDBoMXYxaC0xek0yOSAwaDF2MWgtMXpNMzAgMGgxdjFoLTF6TTMxIDBoMXYxaC0xek0zMiAwaDF2MWgtMXpNMCAxaDF2MWgtMXpNNiAxaDF2MWgtMXpNMTAgMWgxdjFoLTF6TTExIDFoMXYxaC0xek0xMiAxaDF2MWgtMXpNMTMgMWgxdjFoLTF6TTE0IDFoMXYxaC0xek0xNSAxaDF2MWgtMXpNMTcgMWgxdjFoLTF6TTIwIDFoMXYxaC0xek0yMSAxaDF2MWgtMXpNMjIgMWgxdjFoLTF6TTI0IDFoMXYxaC0xek0yNiAxaDF2MWgtMXpNMzIgMWgxdjFoLTF6TTAgMmgxdjFoLTF6TTIgMmgxdjFoLTF6TTMgMmgxdjFoLTF6TTQgMmgxdjFoLTF6TTYgMmgxdjFoLTF6TTggMmgxdjFoLTF6TTkgMmgxdjFoLTF6TTExIDJoMXYxaC0xek0xMyAyaDF2MWgtMXpNMTUgMmgxdjFoLTF6TTE3IDJoMXYxaC0xek0xOCAyaDF2MWgtMXpNMTkgMmgxdjFoLTF6TTIwIDJoMXYxaC0xek0yMSAyaDF2MWgtMXpNMjMgMmgxdjFoLTF6TTI2IDJoMXYxaC0xek0yOCAyaDF2MWgtMXpNMjkgMmgxdjFoLTF6TTMwIDJoMXYxaC0xek0zMiAyaDF2MWgtMXpNMCAzaDF2MWgtMXpNMiAzaDF2MWgtMXpNMyAzaDF2MWgtMXpNNCAzaDF2MWgtMXpNNiAzaDF2MWgtMXpNOCAzaDF2MWgtMXpNMTAgM2gxdjFoLTF6TTExIDNoMXYxaC0xek0xMiAzaDF2MWgtMXpNMTQgM2gxdjFoLTF6TTE1IDNoMXYxaC0xek0xNiAzaDF2MWgtMXpNMTkgM2gxdjFoLTF6TTIwIDNoMXYxaC0xek0yMSAzaDF2MWgtMXpNMjIgM2gxdjFoLTF6TTIzIDNoMXYxaC0xek0yNCAzaDF2MWgtMXpNMjYgM2gxdjFoLTF6TTI4IDNoMXYxaC0xek0yOSAzaDF2MWgtMXpNMzAgM2gxdjFoLTF6TTMyIDNoMXYxaC0xek0wIDRoMXYxaC0xek0yIDRoMXYxaC0xek0zIDRoMXYxaC0xek00IDRoMXYxaC0xek02IDRoMXYxaC0xek04IDRoMXYxaC0xek0xMiA0aDF2MWgtMXpNMTUgNGgxdjFoLTF6TTE3IDRoMXYxaC0xek0xOCA0aDF2MWgtMXpNMjIgNGgxdjFoLTF6TTIzIDRoMXYxaC0xek0yNiA0aDF2MWgtMXpNMjggNGgxdjFoLTF6TTI5IDRoMXYxaC0xek0zMCA0aDF2MWgtMXpNMzIgNGgxdjFoLTF6TTAgNWgxdjFoLTF6TTYgNWgxdjFoLTF6TTggNWgxdjFoLTF6TTkgNWgxdjFoLTF6TTEzIDVoMXYxaC0xek0xNSA1aDF2MWgtMXpNMTYgNWgxdjFoLTF6TTIwIDVoMXYxaC0xek0yMiA1aDF2MWgtMXpNMjYgNWgxdjFoLTF6TTMyIDVoMXYxaC0xek0wIDZoMXYxaC0xek0xIDZoMXYxaC0xek0yIDZoMXYxaC0xek0zIDZoMXYxaC0xek00IDZoMXYxaC0xek01IDZoMXYxaC0xek02IDZoMXYxaC0xek04IDZoMXYxaC0xek0xMCA2aDF2MWgtMXpNMTIgNmgxdjFoLTF6TTE0IDZoMXYxaC0xek0xNiA2aDF2MWgtMXpNMTggNmgxdjFoLTF6TTIwIDZoMXYxaC0xek0yMiA2aDF2MWgtMXpNMjQgNmgxdjFoLTF6TTI2IDZoMXYxaC0xek0yNyA2aDF2MWgtMXpNMjggNmgxdjFoLTF6TTI5IDZoMXYxaC0xek0zMCA2aDF2MWgtMXpNMzEgNmgxdjFoLTF6TTMyIDZoMXYxaC0xek04IDdoMXYxaC0xek0xMCA3aDF2MWgtMXpNMTUgN2gxdjFoLTF6TTIxIDdoMXYxaC0xek0wIDhoMXYxaC0xek0yIDhoMXYxaC0xek0zIDhoMXYxaC0xek00IDhoMXYxaC0xek01IDhoMXYxaC0xek02IDhoMXYxaC0xek0xMCA4aDF2MWgtMXpNMTIgOGgxdjFoLTF6TTEzIDhoMXYxaC0xek0xNCA4aDF2MWgtMXpNMTUgOGgxdjFoLTF6TTE2IDhoMXYxaC0xek0xNyA4aDF2MWgtMXpNMTggOGgxdjFoLTF6TTIyIDhoMXYxaC0xek0yNCA4aDF2MWgtMXpNMjYgOGgxdjFoLTF6TTI3IDhoMXYxaC0xek0yOCA4aDF2MWgtMXpNMjkgOGgxdjFoLTF6TTMwIDhoMXYxaC0xek0yIDloMXYxaC0xek0zIDloMXYxaC0xek00IDloMXYxaC0xek03IDloMXYxaC0xek04IDloMXYxaC0xek05IDloMXYxaC0xek0xMSA5aDF2MWgtMXpNMTIgOWgxdjFoLTF6TTE2IDloMXYxaC0xek0xOCA5aDF2MWgtMXpNMTkgOWgxdjFoLTF6TTIwIDloMXYxaC0xek0yMyA5aDF2MWgtMXpNMjQgOWgxdjFoLTF6TTI2IDloMXYxaC0xek0yNyA5aDF2MWgtMXpNMjkgOWgxdjFoLTF6TTMwIDloMXYxaC0xek0zMiA5aDF2MWgtMXpNMCAxMGgxdjFoLTF6TTEgMTBoMXYxaC0xek0yIDEwaDF2MWgtMXpNMyAxMGgxdjFoLTF6TTQgMTBoMXYxaC0xek01IDEwaDF2MWgtMXpNNiAxMGgxdjFoLTF6TTggMTBoMXYxaC0xek0xMCAxMGgxdjFoLTF6TTEyIDEwaDF2MWgtMXpNMTUgMTBoMXYxaC0xek0xOCAxMGgxdjFoLTF6TTIwIDEwaDF2MWgtMXpNMjIgMTBoMXYxaC0xek0yNSAxMGgxdjFoLTF6TTI2IDEwaDF2MWgtMXpNMjggMTBoMXYxaC0xek0zMCAxMGgxdjFoLTF6TTMxIDEwaDF2MWgtMXpNMCAxMWgxdjFoLTF6TTcgMTFoMXYxaC0xek0xMSAxMWgxdjFoLTF6TTE0IDExaDF2MWgtMXpNMTUgMTFoMXYxaC0xek0xNiAxMWgxdjFoLTF6TTE5IDExaDF2MWgtMXpNMjEgMTFoMXYxaC0xek0yMiAxMWgxdjFoLTF6TTI1IDExaDF2MWgtMXpNMjggMTFoMXYxaC0xek0yOSAxMWgxdjFoLTF6TTMwIDExaDF2MWgtMXpNMSAxMmgxdjFoLTF6TTIgMTJoMXYxaC0xek00IDEyaDF2MWgtMXpNNiAxMmgxdjFoLTF6TTkgMTJoMXYxaC0xek0xMCAxMmgxdjFoLTF6TTEyIDEyaDF2MWgtMXpNMTUgMTJoMXYxaC0xek0xOCAxMmgxdjFoLTF6TTIyIDEyaDF2MWgtMXpNMjQgMTJoMXYxaC0xek0yNSAxMmgxdjFoLTF6TTI4IDEyaDF2MWgtMXpNMjkgMTJoMXYxaC0xek0zMSAxMmgxdjFoLTF6TTAgMTNoMXYxaC0xek0xIDEzaDF2MWgtMXpNMyAxM2gxdjFoLTF6TTQgMTNoMXYxaC0xek01IDEzaDF2MWgtMXpNNyAxM2gxdjFoLTF6TTggMTNoMXYxaC0xek0xMCAxM2gxdjFoLTF6TTEzIDEzaDF2MWgtMXpNMTQgMTNoMXYxaC0xek0xNSAxM2gxdjFoLTF6TTE2IDEzaDF2MWgtMXpNMTcgMTNoMXYxaC0xek0yMCAxM2gxdjFoLTF6TTIxIDEzaDF2MWgtMXpNMjMgMTNoMXYxaC0xek0yNSAxM2gxdjFoLTF6TTI2IDEzaDF2MWgtMXpNMjcgMTNoMXYxaC0xek0yOSAxM2gxdjFoLTF6TTMwIDEzaDF2MWgtMXpNMzEgMTNoMXYxaC0xek0zMiAxM2gxdjFoLTF6TTAgMTRoMXYxaC0xek0xIDE0aDF2MWgtMXpNNCAxNGgxdjFoLTF6TTYgMTRoMXYxaC0xek03IDE0aDF2MWgtMXpNMTEgMTRoMXYxaC0xek0xNCAxNGgxdjFoLTF6TTE3IDE0aDF2MWgtMXpNMTkgMTRoMXYxaC0xek0yMSAxNGgxdjFoLTF6TTI0IDE0aDF2MWgtMXpNMjUgMTRoMXYxaC0xek0yNiAxNGgxdjFoLTF6TTI4IDE0aDF2MWgtMXpNMjkgMTRoMXYxaC0xek0zMCAxNGgxdjFoLTF6TTMxIDE0aDF2MWgtMXpNMyAxNWgxdjFoLTF6TTggMTVoMXYxaC0xek05IDE1aDF2MWgtMXpNMTEgMTVoMXYxaC0xek0xMiAxNWgxdjFoLTF6TTEzIDE1aDF2MWgtMXpNMTYgMTVoMXYxaC0xek0xOSAxNWgxdjFoLTF6TTIwIDE1aDF2MWgtMXpNMjEgMTVoMXYxaC0xek0yMiAxNWgxdjFoLTF6TTIzIDE1aDF2MWgtMXpNMjQgMTVoMXYxaC0xek0yNSAxNWgxdjFoLTF6TTI2IDE1aDF2MWgtMXpNMjcgMTVoMXYxaC0xek0yOSAxNWgxdjFoLTF6TTMwIDE1aDF2MWgtMXpNNCAxNmgxdjFoLTF6TTUgMTZoMXYxaC0xek02IDE2aDF2MWgtMXpNNyAxNmgxdjFoLTF6TTggMTZoMXYxaC0xek0xMiAxNmgxdjFoLTF6TTEzIDE2aDF2MWgtMXpNMTcgMTZoMXYxaC0xek0xOSAxNmgxdjFoLTF6TTIyIDE2aDF2MWgtMXpNMjQgMTZoMXYxaC0xek0yNSAxNmgxdjFoLTF6TTI3IDE2aDF2MWgtMXpNMjggMTZoMXYxaC0xek0yOSAxNmgxdjFoLTF6TTMyIDE2aDF2MWgtMXpNMCAxN2gxdjFoLTF6TTIgMTdoMXYxaC0xek03IDE3aDF2MWgtMXpNOCAxN2gxdjFoLTF6TTkgMTdoMXYxaC0xek0xMCAxN2gxdjFoLTF6TTE2IDE3aDF2MWgtMXpNMTcgMTdoMXYxaC0xek0xOCAxN2gxdjFoLTF6TTE5IDE3aDF2MWgtMXpNMjAgMTdoMXYxaC0xek0yMiAxN2gxdjFoLTF6TTIzIDE3aDF2MWgtMXpNMjYgMTdoMXYxaC0xek0yNyAxN2gxdjFoLTF6TTI5IDE3aDF2MWgtMXpNMzAgMTdoMXYxaC0xek0zMSAxN2gxdjFoLTF6TTMyIDE3aDF2MWgtMXpNMCAxOGgxdjFoLTF6TTEgMThoMXYxaC0xek0yIDE4aDF2MWgtMXpNNCAxOGgxdjFoLTF6TTYgMThoMXYxaC0xek03IDE4aDF2MWgtMXpNOCAxOGgxdjFoLTF6TTEzIDE4aDF2MWgtMXpNMTUgMThoMXYxaC0xek0xNiAxOGgxdjFoLTF6TTE3IDE4aDF2MWgtMXpNMjEgMThoMXYxaC0xek0yMiAxOGgxdjFoLTF6TTI0IDE4aDF2MWgtMXpNMjcgMThoMXYxaC0xek0yOCAxOGgxdjFoLTF6TTMwIDE4aDF2MWgtMXpNMzEgMThoMXYxaC0xek0wIDE5aDF2MWgtMXpNNyAxOWgxdjFoLTF6TTggMTloMXYxaC0xek05IDE5aDF2MWgtMXpNMTAgMTloMXYxaC0xek0xMyAxOWgxdjFoLTF6TTE3IDE5aDF2MWgtMXpNMTggMTloMXYxaC0xek0xOSAxOWgxdjFoLTF6TTIwIDE5aDF2MWgtMXpNMjEgMTloMXYxaC0xek0yMyAxOWgxdjFoLTF6TTI1IDE5aDF2MWgtMXpNMjYgMTloMXYxaC0xek0yNyAxOWgxdjFoLTF6TTI4IDE5aDF2MWgtMXpNMjkgMTloMXYxaC0xek0zMCAxOWgxdjFoLTF6TTMyIDE5aDF2MWgtMXpNMiAyMGgxdjFoLTF6TTMgMjBoMXYxaC0xek02IDIwaDF2MWgtMXpNOCAyMGgxdjFoLTF6TTExIDIwaDF2MWgtMXpNMTIgMjBoMXYxaC0xek0xNSAyMGgxdjFoLTF6TTE2IDIwaDF2MWgtMXpNMTkgMjBoMXYxaC0xek0yMiAyMGgxdjFoLTF6TTI1IDIwaDF2MWgtMXpNMjcgMjBoMXYxaC0xek0yOCAyMGgxdjFoLTF6TTI5IDIwaDF2MWgtMXpNMzEgMjBoMXYxaC0xek0zMiAyMGgxdjFoLTF6TTAgMjFoMXYxaC0xek0xIDIxaDF2MWgtMXpNOSAyMWgxdjFoLTF6TTEyIDIxaDF2MWgtMXpNMTMgMjFoMXYxaC0xek0xNCAyMWgxdjFoLTF6TTE1IDIxaDF2MWgtMXpNMTggMjFoMXYxaC0xek0yMSAyMWgxdjFoLTF6TTIzIDIxaDF2MWgtMXpNMjYgMjFoMXYxaC0xek0zMCAyMWgxdjFoLTF6TTMyIDIxaDF2MWgtMXpNMCAyMmgxdjFoLTF6TTIgMjJoMXYxaC0xek00IDIyaDF2MWgtMXpNNSAyMmgxdjFoLTF6TTYgMjJoMXYxaC0xek03IDIyaDF2MWgtMXpNOSAyMmgxdjFoLTF6TTEzIDIyaDF2MWgtMXpNMTUgMjJoMXYxaC0xek0xNiAyMmgxdjFoLTF6TTIwIDIyaDF2MWgtMXpNMjIgMjJoMXYxaC0xek0yNyAyMmgxdjFoLTF6TTMxIDIyaDF2MWgtMXpNMCAyM2gxdjFoLTF6TTIgMjNoMXYxaC0xek04IDIzaDF2MWgtMXpNMTMgMjNoMXYxaC0xek0xNCAyM2gxdjFoLTF6TTE1IDIzaDF2MWgtMXpNMTkgMjNoMXYxaC0xek0yMSAyM2gxdjFoLTF6TTI0IDIzaDF2MWgtMXpNMjUgMjNoMXYxaC0xek0yNiAyM2gxdjFoLTF6TTMwIDIzaDF2MWgtMXpNMzIgMjNoMXYxaC0xek0wIDI0aDF2MWgtMXpNMyAyNGgxdjFoLTF6TTYgMjRoMXYxaC0xek03IDI0aDF2MWgtMXpNOCAyNGgxdjFoLTF6TTE1IDI0aDF2MWgtMXpNMTYgMjRoMXYxaC0xek0xNyAyNGgxdjFoLTF6TTE5IDI0aDF2MWgtMXpNMjIgMjRoMXYxaC0xek0yNCAyNGgxdjFoLTF6TTI1IDI0aDF2MWgtMXpNMjYgMjRoMXYxaC0xek0yNyAyNGgxdjFoLTF6TTI4IDI0aDF2MWgtMXpNMjkgMjRoMXYxaC0xek04IDI1aDF2MWgtMXpNOSAyNWgxdjFoLTF6TTEwIDI1aDF2MWgtMXpNMTEgMjVoMXYxaC0xek0xMiAyNWgxdjFoLTF6TTE4IDI1aDF2MWgtMXpNMTkgMjVoMXYxaC0xek0yNCAyNWgxdjFoLTF6TTI4IDI1aDF2MWgtMXpNMzAgMjVoMXYxaC0xek0zMiAyNWgxdjFoLTF6TTAgMjZoMXYxaC0xek0xIDI2aDF2MWgtMXpNMiAyNmgxdjFoLTF6TTMgMjZoMXYxaC0xek00IDI2aDF2MWgtMXpNNSAyNmgxdjFoLTF6TTYgMjZoMXYxaC0xek0xMCAyNmgxdjFoLTF6TTEyIDI2aDF2MWgtMXpNMTQgMjZoMXYxaC0xek0xNSAyNmgxdjFoLTF6TTE2IDI2aDF2MWgtMXpNMTggMjZoMXYxaC0xek0yMSAyNmgxdjFoLTF6TTIzIDI2aDF2MWgtMXpNMjQgMjZoMXYxaC0xek0yNiAyNmgxdjFoLTF6TTI4IDI2aDF2MWgtMXpNMzAgMjZoMXYxaC0xek0zMSAyNmgxdjFoLTF6TTAgMjdoMXYxaC0xek02IDI3aDF2MWgtMXpNOCAyN2gxdjFoLTF6TTkgMjdoMXYxaC0xek0xMCAyN2gxdjFoLTF6TTExIDI3aDF2MWgtMXpNMTUgMjdoMXYxaC0xek0xNiAyN2gxdjFoLTF6TTE5IDI3aDF2MWgtMXpNMjEgMjdoMXYxaC0xek0yMiAyN2gxdjFoLTF6TTIzIDI3aDF2MWgtMXpNMjQgMjdoMXYxaC0xek0yOCAyN2gxdjFoLTF6TTI5IDI3aDF2MWgtMXpNMzAgMjdoMXYxaC0xek0zMSAyN2gxdjFoLTF6TTAgMjhoMXYxaC0xek0yIDI4aDF2MWgtMXpNMyAyOGgxdjFoLTF6TTQgMjhoMXYxaC0xek02IDI4aDF2MWgtMXpNOCAyOGgxdjFoLTF6TTEzIDI4aDF2MWgtMXpNMTQgMjhoMXYxaC0xek0xNSAyOGgxdjFoLTF6TTE4IDI4aDF2MWgtMXpNMjIgMjhoMXYxaC0xek0yNCAyOGgxdjFoLTF6TTI1IDI4aDF2MWgtMXpNMjYgMjhoMXYxaC0xek0yNyAyOGgxdjFoLTF6TTI4IDI4aDF2MWgtMXpNMjkgMjhoMXYxaC0xek0zMiAyOGgxdjFoLTF6TTAgMjloMXYxaC0xek0yIDI5aDF2MWgtMXpNMyAyOWgxdjFoLTF6TTQgMjloMXYxaC0xek02IDI5aDF2MWgtMXpNOCAyOWgxdjFoLTF6TTEwIDI5aDF2MWgtMXpNMTIgMjloMXYxaC0xek0xNCAyOWgxdjFoLTF6TTE1IDI5aDF2MWgtMXpNMTYgMjloMXYxaC0xek0xOSAyOWgxdjFoLTF6TTIwIDI5aDF2MWgtMXpNMjEgMjloMXYxaC0xek0yMyAyOWgxdjFoLTF6TTI0IDI5aDF2MWgtMXpNMjUgMjloMXYxaC0xek0yOCAyOWgxdjFoLTF6TTI5IDI5aDF2MWgtMXpNMzEgMjloMXYxaC0xek0zMiAyOWgxdjFoLTF6TTAgMzBoMXYxaC0xek0yIDMwaDF2MWgtMXpNMyAzMGgxdjFoLTF6TTQgMzBoMXYxaC0xek02IDMwaDF2MWgtMXpNOCAzMGgxdjFoLTF6TTkgMzBoMXYxaC0xek0xMCAzMGgxdjFoLTF6TTEyIDMwaDF2MWgtMXpNMjEgMzBoMXYxaC0xek0yMiAzMGgxdjFoLTF6TTI0IDMwaDF2MWgtMXpNMjYgMzBoMXYxaC0xek0yNyAzMGgxdjFoLTF6TTI5IDMwaDF2MWgtMXpNMCAzMWgxdjFoLTF6TTYgMzFoMXYxaC0xek0xNCAzMWgxdjFoLTF6TTE2IDMxaDF2MWgtMXpNMTggMzFoMXYxaC0xek0xOSAzMWgxdjFoLTF6TTIwIDMxaDF2MWgtMXpNMjEgMzFoMXYxaC0xek0yMiAzMWgxdjFoLTF6TTI2IDMxaDF2MWgtMXpNMjggMzFoMXYxaC0xek0yOSAzMWgxdjFoLTF6TTMwIDMxaDF2MWgtMXpNMCAzMmgxdjFoLTF6TTEgMzJoMXYxaC0xek0yIDMyaDF2MWgtMXpNMyAzMmgxdjFoLTF6TTQgMzJoMXYxaC0xek01IDMyaDF2MWgtMXpNNiAzMmgxdjFoLTF6TTggMzJoMXYxaC0xek0xMSAzMmgxdjFoLTF6TTE0IDMyaDF2MWgtMXpNMTYgMzJoMXYxaC0xek0xNyAzMmgxdjFoLTF6TTE5IDMyaDF2MWgtMXpNMjAgMzJoMXYxaC0xek0yMiAzMmgxdjFoLTF6TTIzIDMyaDF2MWgtMXpNMjQgMzJoMXYxaC0xek0yNyAzMmgxdjFoLTF6TTI5IDMyaDF2MWgtMXpNMzEgMzJoMXYxaC0xeiIvPjwvc3ZnPg==", "site": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNSAyNSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj48cmVjdCB3aWR0aD0iMjUiIGhlaWdodD0iMjUiIGZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjMGYxODMwIiBkPSJNMCAwaDF2MWgtMXpNMSAwaDF2MWgtMXpNMiAwaDF2MWgtMXpNMyAwaDF2MWgtMXpNNCAwaDF2MWgtMXpNNSAwaDF2MWgtMXpNNiAwaDF2MWgtMXpNOCAwaDF2MWgtMXpNMTEgMGgxdjFoLTF6TTEyIDBoMXYxaC0xek0xNCAwaDF2MWgtMXpNMTYgMGgxdjFoLTF6TTE4IDBoMXYxaC0xek0xOSAwaDF2MWgtMXpNMjAgMGgxdjFoLTF6TTIxIDBoMXYxaC0xek0yMiAwaDF2MWgtMXpNMjMgMGgxdjFoLTF6TTI0IDBoMXYxaC0xek0wIDFoMXYxaC0xek02IDFoMXYxaC0xek0xMCAxaDF2MWgtMXpNMTEgMWgxdjFoLTF6TTEyIDFoMXYxaC0xek0xMyAxaDF2MWgtMXpNMTQgMWgxdjFoLTF6TTE2IDFoMXYxaC0xek0xOCAxaDF2MWgtMXpNMjQgMWgxdjFoLTF6TTAgMmgxdjFoLTF6TTIgMmgxdjFoLTF6TTMgMmgxdjFoLTF6TTQgMmgxdjFoLTF6TTYgMmgxdjFoLTF6TTggMmgxdjFoLTF6TTEwIDJoMXYxaC0xek0xMSAyaDF2MWgtMXpNMTMgMmgxdjFoLTF6TTE0IDJoMXYxaC0xek0xOCAyaDF2MWgtMXpNMjAgMmgxdjFoLTF6TTIxIDJoMXYxaC0xek0yMiAyaDF2MWgtMXpNMjQgMmgxdjFoLTF6TTAgM2gxdjFoLTF6TTIgM2gxdjFoLTF6TTMgM2gxdjFoLTF6TTQgM2gxdjFoLTF6TTYgM2gxdjFoLTF6TTkgM2gxdjFoLTF6TTEwIDNoMXYxaC0xek0xMSAzaDF2MWgtMXpNMTIgM2gxdjFoLTF6TTEzIDNoMXYxaC0xek0xNCAzaDF2MWgtMXpNMTUgM2gxdjFoLTF6TTE4IDNoMXYxaC0xek0yMCAzaDF2MWgtMXpNMjEgM2gxdjFoLTF6TTIyIDNoMXYxaC0xek0yNCAzaDF2MWgtMXpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNMyA0aDF2MWgtMXpNNCA0aDF2MWgtMXpNNiA0aDF2MWgtMXpNMTAgNGgxdjFoLTF6TTE0IDRoMXYxaC0xek0xOCA0aDF2MWgtMXpNMjAgNGgxdjFoLTF6TTIxIDRoMXYxaC0xek0yMiA0aDF2MWgtMXpNMjQgNGgxdjFoLTF6TTAgNWgxdjFoLTF6TTYgNWgxdjFoLTF6TTggNWgxdjFoLTF6TTEwIDVoMXYxaC0xek0xMSA1aDF2MWgtMXpNMTMgNWgxdjFoLTF6TTE2IDVoMXYxaC0xek0xOCA1aDF2MWgtMXpNMjQgNWgxdjFoLTF6TTAgNmgxdjFoLTF6TTEgNmgxdjFoLTF6TTIgNmgxdjFoLTF6TTMgNmgxdjFoLTF6TTQgNmgxdjFoLTF6TTUgNmgxdjFoLTF6TTYgNmgxdjFoLTF6TTggNmgxdjFoLTF6TTEwIDZoMXYxaC0xek0xMiA2aDF2MWgtMXpNMTQgNmgxdjFoLTF6TTE2IDZoMXYxaC0xek0xOCA2aDF2MWgtMXpNMTkgNmgxdjFoLTF6TTIwIDZoMXYxaC0xek0yMSA2aDF2MWgtMXpNMjIgNmgxdjFoLTF6TTIzIDZoMXYxaC0xek0yNCA2aDF2MWgtMXpNMTAgN2gxdjFoLTF6TTExIDdoMXYxaC0xek0xMiA3aDF2MWgtMXpNMTQgN2gxdjFoLTF6TTE1IDdoMXYxaC0xek0wIDhoMXYxaC0xek0yIDhoMXYxaC0xek02IDhoMXYxaC0xek03IDhoMXYxaC0xek05IDhoMXYxaC0xek0xMCA4aDF2MWgtMXpNMTIgOGgxdjFoLTF6TTE1IDhoMXYxaC0xek0xNiA4aDF2MWgtMXpNMTkgOGgxdjFoLTF6TTIyIDhoMXYxaC0xek0yNCA4aDF2MWgtMXpNNCA5aDF2MWgtMXpNMTIgOWgxdjFoLTF6TTE0IDloMXYxaC0xek0xNSA5aDF2MWgtMXpNMTYgOWgxdjFoLTF6TTE4IDloMXYxaC0xek0xOSA5aDF2MWgtMXpNMjEgOWgxdjFoLTF6TTIzIDloMXYxaC0xek0yNCA5aDF2MWgtMXpNMSAxMGgxdjFoLTF6TTIgMTBoMXYxaC0xek01IDEwaDF2MWgtMXpNNiAxMGgxdjFoLTF6TTcgMTBoMXYxaC0xek04IDEwaDF2MWgtMXpNMTQgMTBoMXYxaC0xek0xNSAxMGgxdjFoLTF6TTE2IDEwaDF2MWgtMXpNMjEgMTBoMXYxaC0xek0yMiAxMGgxdjFoLTF6TTI0IDEwaDF2MWgtMXpNMSAxMWgxdjFoLTF6TTMgMTFoMXYxaC0xek00IDExaDF2MWgtMXpNNSAxMWgxdjFoLTF6TTcgMTFoMXYxaC0xek05IDExaDF2MWgtMXpNMTEgMTFoMXYxaC0xek0xMiAxMWgxdjFoLTF6TTE1IDExaDF2MWgtMXpNMTYgMTFoMXYxaC0xek0xNyAxMWgxdjFoLTF6TTE4IDExaDF2MWgtMXpNMTkgMTFoMXYxaC0xek0yMSAxMWgxdjFoLTF6TTEgMTJoMXYxaC0xek0yIDEyaDF2MWgtMXpNNiAxMmgxdjFoLTF6TTcgMTJoMXYxaC0xek04IDEyaDF2MWgtMXpNOSAxMmgxdjFoLTF6TTExIDEyaDF2MWgtMXpNMTMgMTJoMXYxaC0xek0xNCAxMmgxdjFoLTF6TTE2IDEyaDF2MWgtMXpNMTggMTJoMXYxaC0xek0xOSAxMmgxdjFoLTF6TTI0IDEyaDF2MWgtMXpNMyAxM2gxdjFoLTF6TTQgMTNoMXYxaC0xek01IDEzaDF2MWgtMXpNOCAxM2gxdjFoLTF6TTkgMTNoMXYxaC0xek0xMCAxM2gxdjFoLTF6TTEzIDEzaDF2MWgtMXpNMTUgMTNoMXYxaC0xek0xOCAxM2gxdjFoLTF6TTE5IDEzaDF2MWgtMXpNMjMgMTNoMXYxaC0xek0yNCAxM2gxdjFoLTF6TTAgMTRoMXYxaC0xek0xIDE0aDF2MWgtMXpNMiAxNGgxdjFoLTF6TTMgMTRoMXYxaC0xek02IDE0aDF2MWgtMXpNNyAxNGgxdjFoLTF6TTEwIDE0aDF2MWgtMXpNMTEgMTRoMXYxaC0xek0xNSAxNGgxdjFoLTF6TTE4IDE0aDF2MWgtMXpNMjEgMTRoMXYxaC0xek0yMiAxNGgxdjFoLTF6TTI0IDE0aDF2MWgtMXpNNSAxNWgxdjFoLTF6TTkgMTVoMXYxaC0xek0xMyAxNWgxdjFoLTF6TTE2IDE1aDF2MWgtMXpNMTkgMTVoMXYxaC0xek0yMCAxNWgxdjFoLTF6TTIxIDE1aDF2MWgtMXpNMCAxNmgxdjFoLTF6TTEgMTZoMXYxaC0xek00IDE2aDF2MWgtMXpNNiAxNmgxdjFoLTF6TTcgMTZoMXYxaC0xek05IDE2aDF2MWgtMXpNMTAgMTZoMXYxaC0xek0xMSAxNmgxdjFoLTF6TTEyIDE2aDF2MWgtMXpNMTMgMTZoMXYxaC0xek0xNSAxNmgxdjFoLTF6TTE2IDE2aDF2MWgtMXpNMTcgMTZoMXYxaC0xek0xOCAxNmgxdjFoLTF6TTE5IDE2aDF2MWgtMXpNMjAgMTZoMXYxaC0xek0yMyAxNmgxdjFoLTF6TTggMTdoMXYxaC0xek0xMCAxN2gxdjFoLTF6TTEyIDE3aDF2MWgtMXpNMTUgMTdoMXYxaC0xek0xNiAxN2gxdjFoLTF6TTIwIDE3aDF2MWgtMXpNMjQgMTdoMXYxaC0xek0wIDE4aDF2MWgtMXpNMSAxOGgxdjFoLTF6TTIgMThoMXYxaC0xek0zIDE4aDF2MWgtMXpNNCAxOGgxdjFoLTF6TTUgMThoMXYxaC0xek02IDE4aDF2MWgtMXpNOCAxOGgxdjFoLTF6TTEwIDE4aDF2MWgtMXpNMTIgMThoMXYxaC0xek0xMyAxOGgxdjFoLTF6TTE0IDE4aDF2MWgtMXpNMTYgMThoMXYxaC0xek0xOCAxOGgxdjFoLTF6TTIwIDE4aDF2MWgtMXpNMjQgMThoMXYxaC0xek0wIDE5aDF2MWgtMXpNNiAxOWgxdjFoLTF6TTEwIDE5aDF2MWgtMXpNMTEgMTloMXYxaC0xek0xMiAxOWgxdjFoLTF6TTE0IDE5aDF2MWgtMXpNMTUgMTloMXYxaC0xek0xNiAxOWgxdjFoLTF6TTIwIDE5aDF2MWgtMXpNMCAyMGgxdjFoLTF6TTIgMjBoMXYxaC0xek0zIDIwaDF2MWgtMXpNNCAyMGgxdjFoLTF6TTYgMjBoMXYxaC0xek05IDIwaDF2MWgtMXpNMTAgMjBoMXYxaC0xek0xMyAyMGgxdjFoLTF6TTE0IDIwaDF2MWgtMXpNMTUgMjBoMXYxaC0xek0xNiAyMGgxdjFoLTF6TTE3IDIwaDF2MWgtMXpNMTggMjBoMXYxaC0xek0xOSAyMGgxdjFoLTF6TTIwIDIwaDF2MWgtMXpNMjQgMjBoMXYxaC0xek0wIDIxaDF2MWgtMXpNMiAyMWgxdjFoLTF6TTMgMjFoMXYxaC0xek00IDIxaDF2MWgtMXpNNiAyMWgxdjFoLTF6TTEwIDIxaDF2MWgtMXpNMTMgMjFoMXYxaC0xek0xNCAyMWgxdjFoLTF6TTE3IDIxaDF2MWgtMXpNMjAgMjFoMXYxaC0xek0yMiAyMWgxdjFoLTF6TTIzIDIxaDF2MWgtMXpNMCAyMmgxdjFoLTF6TTIgMjJoMXYxaC0xek0zIDIyaDF2MWgtMXpNNCAyMmgxdjFoLTF6TTYgMjJoMXYxaC0xek04IDIyaDF2MWgtMXpNOSAyMmgxdjFoLTF6TTEwIDIyaDF2MWgtMXpNMTEgMjJoMXYxaC0xek0xNiAyMmgxdjFoLTF6TTE3IDIyaDF2MWgtMXpNMTkgMjJoMXYxaC0xek0yMCAyMmgxdjFoLTF6TTIxIDIyaDF2MWgtMXpNMjMgMjJoMXYxaC0xek0yNCAyMmgxdjFoLTF6TTAgMjNoMXYxaC0xek02IDIzaDF2MWgtMXpNMTMgMjNoMXYxaC0xek0xNiAyM2gxdjFoLTF6TTE3IDIzaDF2MWgtMXpNMTkgMjNoMXYxaC0xek0yMCAyM2gxdjFoLTF6TTAgMjRoMXYxaC0xek0xIDI0aDF2MWgtMXpNMiAyNGgxdjFoLTF6TTMgMjRoMXYxaC0xek00IDI0aDF2MWgtMXpNNSAyNGgxdjFoLTF6TTYgMjRoMXYxaC0xek04IDI0aDF2MWgtMXpNOSAyNGgxdjFoLTF6TTEwIDI0aDF2MWgtMXpNMTEgMjRoMXYxaC0xek0xMiAyNGgxdjFoLTF6TTEzIDI0aDF2MWgtMXpNMTYgMjRoMXYxaC0xek0xOCAyNGgxdjFoLTF6TTIxIDI0aDF2MWgtMXpNMjQgMjRoMXYxaC0xeiIvPjwvc3ZnPg==", "curation": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0NSA0NSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj48cmVjdCB3aWR0aD0iNDUiIGhlaWdodD0iNDUiIGZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjMGYxODMwIiBkPSJNMCAwaDF2MWgtMXpNMSAwaDF2MWgtMXpNMiAwaDF2MWgtMXpNMyAwaDF2MWgtMXpNNCAwaDF2MWgtMXpNNSAwaDF2MWgtMXpNNiAwaDF2MWgtMXpNMTAgMGgxdjFoLTF6TTEyIDBoMXYxaC0xek0xMyAwaDF2MWgtMXpNMTQgMGgxdjFoLTF6TTE1IDBoMXYxaC0xek0xNiAwaDF2MWgtMXpNMTggMGgxdjFoLTF6TTE5IDBoMXYxaC0xek0yMSAwaDF2MWgtMXpNMjcgMGgxdjFoLTF6TTMwIDBoMXYxaC0xek0zMyAwaDF2MWgtMXpNMzYgMGgxdjFoLTF6TTM4IDBoMXYxaC0xek0zOSAwaDF2MWgtMXpNNDAgMGgxdjFoLTF6TTQxIDBoMXYxaC0xek00MiAwaDF2MWgtMXpNNDMgMGgxdjFoLTF6TTQ0IDBoMXYxaC0xek0wIDFoMXYxaC0xek02IDFoMXYxaC0xek05IDFoMXYxaC0xek0xNSAxaDF2MWgtMXpNMTYgMWgxdjFoLTF6TTIwIDFoMXYxaC0xek0yMiAxaDF2MWgtMXpNMjMgMWgxdjFoLTF6TTI0IDFoMXYxaC0xek0yNSAxaDF2MWgtMXpNMjYgMWgxdjFoLTF6TTMxIDFoMXYxaC0xek0zMyAxaDF2MWgtMXpNMzUgMWgxdjFoLTF6TTM4IDFoMXYxaC0xek00NCAxaDF2MWgtMXpNMCAyaDF2MWgtMXpNMiAyaDF2MWgtMXpNMyAyaDF2MWgtMXpNNCAyaDF2MWgtMXpNNiAyaDF2MWgtMXpNOCAyaDF2MWgtMXpNMTAgMmgxdjFoLTF6TTExIDJoMXYxaC0xek0xMiAyaDF2MWgtMXpNMTQgMmgxdjFoLTF6TTE4IDJoMXYxaC0xek0xOSAyaDF2MWgtMXpNMjEgMmgxdjFoLTF6TTIzIDJoMXYxaC0xek0yNyAyaDF2MWgtMXpNMjggMmgxdjFoLTF6TTI5IDJoMXYxaC0xek0zMiAyaDF2MWgtMXpNMzMgMmgxdjFoLTF6TTM1IDJoMXYxaC0xek0zOCAyaDF2MWgtMXpNNDAgMmgxdjFoLTF6TTQxIDJoMXYxaC0xek00MiAyaDF2MWgtMXpNNDQgMmgxdjFoLTF6TTAgM2gxdjFoLTF6TTIgM2gxdjFoLTF6TTMgM2gxdjFoLTF6TTQgM2gxdjFoLTF6TTYgM2gxdjFoLTF6TTggM2gxdjFoLTF6TTEwIDNoMXYxaC0xek0xNyAzaDF2MWgtMXpNMTggM2gxdjFoLTF6TTIwIDNoMXYxaC0xek0yMiAzaDF2MWgtMXpNMjMgM2gxdjFoLTF6TTI1IDNoMXYxaC0xek0yNiAzaDF2MWgtMXpNMjkgM2gxdjFoLTF6TTMxIDNoMXYxaC0xek0zNSAzaDF2MWgtMXpNMzYgM2gxdjFoLTF6TTM4IDNoMXYxaC0xek00MCAzaDF2MWgtMXpNNDEgM2gxdjFoLTF6TTQyIDNoMXYxaC0xek00NCAzaDF2MWgtMXpNMCA0aDF2MWgtMXpNMiA0aDF2MWgtMXpNMyA0aDF2MWgtMXpNNCA0aDF2MWgtMXpNNiA0aDF2MWgtMXpNOCA0aDF2MWgtMXpNOSA0aDF2MWgtMXpNMTAgNGgxdjFoLTF6TTEyIDRoMXYxaC0xek0xMyA0aDF2MWgtMXpNMTQgNGgxdjFoLTF6TTE2IDRoMXYxaC0xek0xOCA0aDF2MWgtMXpNMTkgNGgxdjFoLTF6TTIwIDRoMXYxaC0xek0yMSA0aDF2MWgtMXpNMjIgNGgxdjFoLTF6TTIzIDRoMXYxaC0xek0yNCA0aDF2MWgtMXpNMjkgNGgxdjFoLTF6TTMwIDRoMXYxaC0xek0zMiA0aDF2MWgtMXpNMzQgNGgxdjFoLTF6TTM1IDRoMXYxaC0xek0zNiA0aDF2MWgtMXpNMzggNGgxdjFoLTF6TTQwIDRoMXYxaC0xek00MSA0aDF2MWgtMXpNNDIgNGgxdjFoLTF6TTQ0IDRoMXYxaC0xek0wIDVoMXYxaC0xek02IDVoMXYxaC0xek04IDVoMXYxaC0xek05IDVoMXYxaC0xek0xMSA1aDF2MWgtMXpNMTQgNWgxdjFoLTF6TTE1IDVoMXYxaC0xek0xNiA1aDF2MWgtMXpNMTcgNWgxdjFoLTF6TTE4IDVoMXYxaC0xek0yMCA1aDF2MWgtMXpNMjQgNWgxdjFoLTF6TTI1IDVoMXYxaC0xek0yNiA1aDF2MWgtMXpNMjcgNWgxdjFoLTF6TTI5IDVoMXYxaC0xek0zMiA1aDF2MWgtMXpNMzMgNWgxdjFoLTF6TTM4IDVoMXYxaC0xek00NCA1aDF2MWgtMXpNMCA2aDF2MWgtMXpNMSA2aDF2MWgtMXpNMiA2aDF2MWgtMXpNMyA2aDF2MWgtMXpNNCA2aDF2MWgtMXpNNSA2aDF2MWgtMXpNNiA2aDF2MWgtMXpNOCA2aDF2MWgtMXpNMTAgNmgxdjFoLTF6TTEyIDZoMXYxaC0xek0xNCA2aDF2MWgtMXpNMTYgNmgxdjFoLTF6TTE4IDZoMXYxaC0xek0yMCA2aDF2MWgtMXpNMjIgNmgxdjFoLTF6TTI0IDZoMXYxaC0xek0yNiA2aDF2MWgtMXpNMjggNmgxdjFoLTF6TTMwIDZoMXYxaC0xek0zMiA2aDF2MWgtMXpNMzQgNmgxdjFoLTF6TTM2IDZoMXYxaC0xek0zOCA2aDF2MWgtMXpNMzkgNmgxdjFoLTF6TTQwIDZoMXYxaC0xek00MSA2aDF2MWgtMXpNNDIgNmgxdjFoLTF6TTQzIDZoMXYxaC0xek00NCA2aDF2MWgtMXpNOCA3aDF2MWgtMXpNOSA3aDF2MWgtMXpNMTAgN2gxdjFoLTF6TTExIDdoMXYxaC0xek0xMiA3aDF2MWgtMXpNMTYgN2gxdjFoLTF6TTE5IDdoMXYxaC0xek0yMCA3aDF2MWgtMXpNMjQgN2gxdjFoLTF6TTI1IDdoMXYxaC0xek0yNiA3aDF2MWgtMXpNMjcgN2gxdjFoLTF6TTI4IDdoMXYxaC0xek0yOSA3aDF2MWgtMXpNMzAgN2gxdjFoLTF6TTMxIDdoMXYxaC0xek0zMiA3aDF2MWgtMXpNMzMgN2gxdjFoLTF6TTM1IDdoMXYxaC0xek0wIDhoMXYxaC0xek0yIDhoMXYxaC0xek0zIDhoMXYxaC0xek00IDhoMXYxaC0xek01IDhoMXYxaC0xek02IDhoMXYxaC0xek05IDhoMXYxaC0xek0xMCA4aDF2MWgtMXpNMTYgOGgxdjFoLTF6TTE3IDhoMXYxaC0xek0xOCA4aDF2MWgtMXpNMjAgOGgxdjFoLTF6TTIxIDhoMXYxaC0xek0yMiA4aDF2MWgtMXpNMjMgOGgxdjFoLTF6TTI0IDhoMXYxaC0xek0yOSA4aDF2MWgtMXpNMzAgOGgxdjFoLTF6TTMxIDhoMXYxaC0xek0zNCA4aDF2MWgtMXpNMzYgOGgxdjFoLTF6TTM4IDhoMXYxaC0xek0zOSA4aDF2MWgtMXpNNDAgOGgxdjFoLTF6TTQxIDhoMXYxaC0xek00MiA4aDF2MWgtMXpNMCA5aDF2MWgtMXpNMiA5aDF2MWgtMXpNMyA5aDF2MWgtMXpNNCA5aDF2MWgtMXpNNyA5aDF2MWgtMXpNOCA5aDF2MWgtMXpNOSA5aDF2MWgtMXpNMTQgOWgxdjFoLTF6TTIxIDloMXYxaC0xek0yMiA5aDF2MWgtMXpNMjUgOWgxdjFoLTF6TTI4IDloMXYxaC0xek0zMCA5aDF2MWgtMXpNMzEgOWgxdjFoLTF6TTM1IDloMXYxaC0xek0zNiA5aDF2MWgtMXpNNDAgOWgxdjFoLTF6TTQyIDloMXYxaC0xek00MyA5aDF2MWgtMXpNNDQgOWgxdjFoLTF6TTEgMTBoMXYxaC0xek0yIDEwaDF2MWgtMXpNMyAxMGgxdjFoLTF6TTUgMTBoMXYxaC0xek02IDEwaDF2MWgtMXpNOCAxMGgxdjFoLTF6TTkgMTBoMXYxaC0xek0xMCAxMGgxdjFoLTF6TTExIDEwaDF2MWgtMXpNMTIgMTBoMXYxaC0xek0xNiAxMGgxdjFoLTF6TTE4IDEwaDF2MWgtMXpNMjAgMTBoMXYxaC0xek0yMSAxMGgxdjFoLTF6TTIzIDEwaDF2MWgtMXpNMjQgMTBoMXYxaC0xek0yNiAxMGgxdjFoLTF6TTI5IDEwaDF2MWgtMXpNMzIgMTBoMXYxaC0xek0zMyAxMGgxdjFoLTF6TTM0IDEwaDF2MWgtMXpNMzUgMTBoMXYxaC0xek0zNyAxMGgxdjFoLTF6TTM4IDEwaDF2MWgtMXpNMzkgMTBoMXYxaC0xek00MSAxMGgxdjFoLTF6TTQzIDEwaDF2MWgtMXpNMCAxMWgxdjFoLTF6TTIgMTFoMXYxaC0xek04IDExaDF2MWgtMXpNMTAgMTFoMXYxaC0xek0xNCAxMWgxdjFoLTF6TTE1IDExaDF2MWgtMXpNMTYgMTFoMXYxaC0xek0xNyAxMWgxdjFoLTF6TTE5IDExaDF2MWgtMXpNMjMgMTFoMXYxaC0xek0yNyAxMWgxdjFoLTF6TTI4IDExaDF2MWgtMXpNMzAgMTFoMXYxaC0xek0zMiAxMWgxdjFoLTF6TTMzIDExaDF2MWgtMXpNMzYgMTFoMXYxaC0xek00MiAxMWgxdjFoLTF6TTEgMTJoMXYxaC0xek0yIDEyaDF2MWgtMXpNMyAxMmgxdjFoLTF6TTQgMTJoMXYxaC0xek02IDEyaDF2MWgtMXpNNyAxMmgxdjFoLTF6TTggMTJoMXYxaC0xek0xMCAxMmgxdjFoLTF6TTEyIDEyaDF2MWgtMXpNMTMgMTJoMXYxaC0xek0xNSAxMmgxdjFoLTF6TTE2IDEyaDF2MWgtMXpNMTcgMTJoMXYxaC0xek0xOCAxMmgxdjFoLTF6TTE5IDEyaDF2MWgtMXpNMjAgMTJoMXYxaC0xek0yMSAxMmgxdjFoLTF6TTIyIDEyaDF2MWgtMXpNMjMgMTJoMXYxaC0xek0yNCAxMmgxdjFoLTF6TTI1IDEyaDF2MWgtMXpNMjkgMTJoMXYxaC0xek0zMSAxMmgxdjFoLTF6TTM0IDEyaDF2MWgtMXpNMzcgMTJoMXYxaC0xek00NCAxMmgxdjFoLTF6TTAgMTNoMXYxaC0xek00IDEzaDF2MWgtMXpNMTEgMTNoMXYxaC0xek0xNCAxM2gxdjFoLTF6TTE2IDEzaDF2MWgtMXpNMTcgMTNoMXYxaC0xek0xOSAxM2gxdjFoLTF6TTIwIDEzaDF2MWgtMXpNMjEgMTNoMXYxaC0xek0yMiAxM2gxdjFoLTF6TTI0IDEzaDF2MWgtMXpNMjUgMTNoMXYxaC0xek0zMCAxM2gxdjFoLTF6TTMxIDEzaDF2MWgtMXpNMzUgMTNoMXYxaC0xek0zNiAxM2gxdjFoLTF6TTM3IDEzaDF2MWgtMXpNNDMgMTNoMXYxaC0xek00NCAxM2gxdjFoLTF6TTMgMTRoMXYxaC0xek01IDE0aDF2MWgtMXpNNiAxNGgxdjFoLTF6TTcgMTRoMXYxaC0xek04IDE0aDF2MWgtMXpNMTQgMTRoMXYxaC0xek0xNSAxNGgxdjFoLTF6TTE4IDE0aDF2MWgtMXpNMTkgMTRoMXYxaC0xek0yMyAxNGgxdjFoLTF6TTI0IDE0aDF2MWgtMXpNMzEgMTRoMXYxaC0xek0zMyAxNGgxdjFoLTF6TTM0IDE0aDF2MWgtMXpNMzUgMTRoMXYxaC0xek0zNiAxNGgxdjFoLTF6TTQwIDE0aDF2MWgtMXpNNDEgMTRoMXYxaC0xek00MiAxNGgxdjFoLTF6TTQzIDE0aDF2MWgtMXpNMiAxNWgxdjFoLTF6TTMgMTVoMXYxaC0xek01IDE1aDF2MWgtMXpNNyAxNWgxdjFoLTF6TTggMTVoMXYxaC0xek0xMSAxNWgxdjFoLTF6TTE0IDE1aDF2MWgtMXpNMTUgMTVoMXYxaC0xek0xNiAxNWgxdjFoLTF6TTE3IDE1aDF2MWgtMXpNMTkgMTVoMXYxaC0xek0yNCAxNWgxdjFoLTF6TTI1IDE1aDF2MWgtMXpNMjkgMTVoMXYxaC0xek0zMSAxNWgxdjFoLTF6TTMyIDE1aDF2MWgtMXpNMzcgMTVoMXYxaC0xek0zOSAxNWgxdjFoLTF6TTQyIDE1aDF2MWgtMXpNMSAxNmgxdjFoLTF6TTMgMTZoMXYxaC0xek00IDE2aDF2MWgtMXpNNSAxNmgxdjFoLTF6TTYgMTZoMXYxaC0xek0xMCAxNmgxdjFoLTF6TTExIDE2aDF2MWgtMXpNMTQgMTZoMXYxaC0xek0xNSAxNmgxdjFoLTF6TTE3IDE2aDF2MWgtMXpNMTggMTZoMXYxaC0xek0xOSAxNmgxdjFoLTF6TTIwIDE2aDF2MWgtMXpNMjEgMTZoMXYxaC0xek0yMiAxNmgxdjFoLTF6TTMxIDE2aDF2MWgtMXpNMzMgMTZoMXYxaC0xek0zNSAxNmgxdjFoLTF6TTM3IDE2aDF2MWgtMXpNMzggMTZoMXYxaC0xek00MSAxNmgxdjFoLTF6TTQ0IDE2aDF2MWgtMXpNNCAxN2gxdjFoLTF6TTUgMTdoMXYxaC0xek03IDE3aDF2MWgtMXpNOCAxN2gxdjFoLTF6TTExIDE3aDF2MWgtMXpNMTIgMTdoMXYxaC0xek0xMyAxN2gxdjFoLTF6TTE1IDE3aDF2MWgtMXpNMTYgMTdoMXYxaC0xek0yMCAxN2gxdjFoLTF6TTIyIDE3aDF2MWgtMXpNMjMgMTdoMXYxaC0xek0yNCAxN2gxdjFoLTF6TTI1IDE3aDF2MWgtMXpNMjggMTdoMXYxaC0xek0yOSAxN2gxdjFoLTF6TTMwIDE3aDF2MWgtMXpNMzUgMTdoMXYxaC0xek0zNiAxN2gxdjFoLTF6TTM3IDE3aDF2MWgtMXpNNDAgMTdoMXYxaC0xek00MiAxN2gxdjFoLTF6TTQzIDE3aDF2MWgtMXpNNDQgMTdoMXYxaC0xek0wIDE4aDF2MWgtMXpNMyAxOGgxdjFoLTF6TTQgMThoMXYxaC0xek01IDE4aDF2MWgtMXpNNiAxOGgxdjFoLTF6TTcgMThoMXYxaC0xek05IDE4aDF2MWgtMXpNMTAgMThoMXYxaC0xek0xMSAxOGgxdjFoLTF6TTEyIDE4aDF2MWgtMXpNMTYgMThoMXYxaC0xek0xNyAxOGgxdjFoLTF6TTE5IDE4aDF2MWgtMXpNMjAgMThoMXYxaC0xek0yMyAxOGgxdjFoLTF6TTI0IDE4aDF2MWgtMXpNMjUgMThoMXYxaC0xek0yNiAxOGgxdjFoLTF6TTI4IDE4aDF2MWgtMXpNMzUgMThoMXYxaC0xek0zOCAxOGgxdjFoLTF6TTM5IDE4aDF2MWgtMXpNNDAgMThoMXYxaC0xek00MSAxOGgxdjFoLTF6TTQyIDE4aDF2MWgtMXpNNDMgMThoMXYxaC0xek0yIDE5aDF2MWgtMXpNNSAxOWgxdjFoLTF6TTggMTloMXYxaC0xek0xMyAxOWgxdjFoLTF6TTE3IDE5aDF2MWgtMXpNMTkgMTloMXYxaC0xek0yMSAxOWgxdjFoLTF6TTI0IDE5aDF2MWgtMXpNMjUgMTloMXYxaC0xek0yNiAxOWgxdjFoLTF6TTI3IDE5aDF2MWgtMXpNMjggMTloMXYxaC0xek0yOSAxOWgxdjFoLTF6TTMwIDE5aDF2MWgtMXpNMzEgMTloMXYxaC0xek0zMiAxOWgxdjFoLTF6TTMzIDE5aDF2MWgtMXpNMzQgMTloMXYxaC0xek0zNSAxOWgxdjFoLTF6TTM4IDE5aDF2MWgtMXpNMzkgMTloMXYxaC0xek00MSAxOWgxdjFoLTF6TTQyIDE5aDF2MWgtMXpNNDQgMTloMXYxaC0xek0wIDIwaDF2MWgtMXpNMSAyMGgxdjFoLTF6TTIgMjBoMXYxaC0xek00IDIwaDF2MWgtMXpNNSAyMGgxdjFoLTF6TTYgMjBoMXYxaC0xek03IDIwaDF2MWgtMXpNOCAyMGgxdjFoLTF6TTkgMjBoMXYxaC0xek0xMCAyMGgxdjFoLTF6TTExIDIwaDF2MWgtMXpNMTUgMjBoMXYxaC0xek0xNyAyMGgxdjFoLTF6TTE4IDIwaDF2MWgtMXpNMTkgMjBoMXYxaC0xek0yMCAyMGgxdjFoLTF6TTIxIDIwaDF2MWgtMXpNMjIgMjBoMXYxaC0xek0yMyAyMGgxdjFoLTF6TTI0IDIwaDF2MWgtMXpNMjUgMjBoMXYxaC0xek0yNiAyMGgxdjFoLTF6TTMwIDIwaDF2MWgtMXpNMzEgMjBoMXYxaC0xek0zNCAyMGgxdjFoLTF6TTM2IDIwaDF2MWgtMXpNMzcgMjBoMXYxaC0xek0zOCAyMGgxdjFoLTF6TTM5IDIwaDF2MWgtMXpNNDAgMjBoMXYxaC0xek00MSAyMGgxdjFoLTF6TTQyIDIwaDF2MWgtMXpNNDMgMjBoMXYxaC0xek00NCAyMGgxdjFoLTF6TTEgMjFoMXYxaC0xek0zIDIxaDF2MWgtMXpNNCAyMWgxdjFoLTF6TTggMjFoMXYxaC0xek05IDIxaDF2MWgtMXpNMTAgMjFoMXYxaC0xek0xMiAyMWgxdjFoLTF6TTE3IDIxaDF2MWgtMXpNMjAgMjFoMXYxaC0xek0yNCAyMWgxdjFoLTF6TTI1IDIxaDF2MWgtMXpNMjcgMjFoMXYxaC0xek0yOCAyMWgxdjFoLTF6TTI5IDIxaDF2MWgtMXpNMzAgMjFoMXYxaC0xek0zMiAyMWgxdjFoLTF6TTM1IDIxaDF2MWgtMXpNMzYgMjFoMXYxaC0xek00MCAyMWgxdjFoLTF6TTQxIDIxaDF2MWgtMXpNNDIgMjFoMXYxaC0xek00MyAyMWgxdjFoLTF6TTQ0IDIxaDF2MWgtMXpNMiAyMmgxdjFoLTF6TTMgMjJoMXYxaC0xek00IDIyaDF2MWgtMXpNNiAyMmgxdjFoLTF6TTggMjJoMXYxaC0xek05IDIyaDF2MWgtMXpNMTAgMjJoMXYxaC0xek0xMSAyMmgxdjFoLTF6TTEyIDIyaDF2MWgtMXpNMTQgMjJoMXYxaC0xek0xNSAyMmgxdjFoLTF6TTE2IDIyaDF2MWgtMXpNMTcgMjJoMXYxaC0xek0xOCAyMmgxdjFoLTF6TTE5IDIyaDF2MWgtMXpNMjAgMjJoMXYxaC0xek0yMiAyMmgxdjFoLTF6TTI0IDIyaDF2MWgtMXpNMjYgMjJoMXYxaC0xek0yOCAyMmgxdjFoLTF6TTMwIDIyaDF2MWgtMXpNMzQgMjJoMXYxaC0xek0zNSAyMmgxdjFoLTF6TTM2IDIyaDF2MWgtMXpNMzggMjJoMXYxaC0xek00MCAyMmgxdjFoLTF6TTQyIDIyaDF2MWgtMXpNNDMgMjJoMXYxaC0xek0wIDIzaDF2MWgtMXpNMSAyM2gxdjFoLTF6TTQgMjNoMXYxaC0xek04IDIzaDF2MWgtMXpNMTQgMjNoMXYxaC0xek0yMCAyM2gxdjFoLTF6TTI0IDIzaDF2MWgtMXpNMjUgMjNoMXYxaC0xek0yNyAyM2gxdjFoLTF6TTI4IDIzaDF2MWgtMXpNMzAgMjNoMXYxaC0xek0zMiAyM2gxdjFoLTF6TTMzIDIzaDF2MWgtMXpNMzYgMjNoMXYxaC0xek00MCAyM2gxdjFoLTF6TTQxIDIzaDF2MWgtMXpNNDIgMjNoMXYxaC0xek00MyAyM2gxdjFoLTF6TTQ0IDIzaDF2MWgtMXpNMCAyNGgxdjFoLTF6TTEgMjRoMXYxaC0xek0yIDI0aDF2MWgtMXpNMyAyNGgxdjFoLTF6TTQgMjRoMXYxaC0xek01IDI0aDF2MWgtMXpNNiAyNGgxdjFoLTF6TTcgMjRoMXYxaC0xek04IDI0aDF2MWgtMXpNOSAyNGgxdjFoLTF6TTEwIDI0aDF2MWgtMXpNMTQgMjRoMXYxaC0xek0xOCAyNGgxdjFoLTF6TTIwIDI0aDF2MWgtMXpNMjEgMjRoMXYxaC0xek0yMiAyNGgxdjFoLTF6TTIzIDI0aDF2MWgtMXpNMjQgMjRoMXYxaC0xek0yNSAyNGgxdjFoLTF6TTMxIDI0aDF2MWgtMXpNMzQgMjRoMXYxaC0xek0zNSAyNGgxdjFoLTF6TTM2IDI0aDF2MWgtMXpNMzcgMjRoMXYxaC0xek0zOCAyNGgxdjFoLTF6TTM5IDI0aDF2MWgtMXpNNDAgMjRoMXYxaC0xek00MSAyNGgxdjFoLTF6TTQzIDI0aDF2MWgtMXpNNDQgMjRoMXYxaC0xek0wIDI1aDF2MWgtMXpNMSAyNWgxdjFoLTF6TTIgMjVoMXYxaC0xek00IDI1aDF2MWgtMXpNNSAyNWgxdjFoLTF6TTggMjVoMXYxaC0xek0xMCAyNWgxdjFoLTF6TTExIDI1aDF2MWgtMXpNMTQgMjVoMXYxaC0xek0xNiAyNWgxdjFoLTF6TTE4IDI1aDF2MWgtMXpNMTkgMjVoMXYxaC0xek0yMCAyNWgxdjFoLTF6TTIxIDI1aDF2MWgtMXpNMjIgMjVoMXYxaC0xek0yOCAyNWgxdjFoLTF6TTI5IDI1aDF2MWgtMXpNMzAgMjVoMXYxaC0xek0zMiAyNWgxdjFoLTF6TTM2IDI1aDF2MWgtMXpNNDEgMjVoMXYxaC0xek00NCAyNWgxdjFoLTF6TTEgMjZoMXYxaC0xek0yIDI2aDF2MWgtMXpNNSAyNmgxdjFoLTF6TTYgMjZoMXYxaC0xek04IDI2aDF2MWgtMXpNOSAyNmgxdjFoLTF6TTEwIDI2aDF2MWgtMXpNMTIgMjZoMXYxaC0xek0xMyAyNmgxdjFoLTF6TTIwIDI2aDF2MWgtMXpNMjYgMjZoMXYxaC0xek0yOCAyNmgxdjFoLTF6TTI5IDI2aDF2MWgtMXpNMzAgMjZoMXYxaC0xek0zNCAyNmgxdjFoLTF6TTM3IDI2aDF2MWgtMXpNNDAgMjZoMXYxaC0xek00MSAyNmgxdjFoLTF6TTQzIDI2aDF2MWgtMXpNMCAyN2gxdjFoLTF6TTIgMjdoMXYxaC0xek0zIDI3aDF2MWgtMXpNNSAyN2gxdjFoLTF6TTcgMjdoMXYxaC0xek05IDI3aDF2MWgtMXpNMTAgMjdoMXYxaC0xek0xMSAyN2gxdjFoLTF6TTEzIDI3aDF2MWgtMXpNMTQgMjdoMXYxaC0xek0xNiAyN2gxdjFoLTF6TTE3IDI3aDF2MWgtMXpNMjAgMjdoMXYxaC0xek0yMiAyN2gxdjFoLTF6TTIzIDI3aDF2MWgtMXpNMjQgMjdoMXYxaC0xek0yNiAyN2gxdjFoLTF6TTI3IDI3aDF2MWgtMXpNMjggMjdoMXYxaC0xek0yOSAyN2gxdjFoLTF6TTMzIDI3aDF2MWgtMXpNMzUgMjdoMXYxaC0xek0zNiAyN2gxdjFoLTF6TTM3IDI3aDF2MWgtMXpNMzggMjdoMXYxaC0xek00MCAyN2gxdjFoLTF6TTQxIDI3aDF2MWgtMXpNNDIgMjdoMXYxaC0xek00NCAyN2gxdjFoLTF6TTAgMjhoMXYxaC0xek00IDI4aDF2MWgtMXpNNiAyOGgxdjFoLTF6TTggMjhoMXYxaC0xek0xMCAyOGgxdjFoLTF6TTExIDI4aDF2MWgtMXpNMTIgMjhoMXYxaC0xek0xNSAyOGgxdjFoLTF6TTE2IDI4aDF2MWgtMXpNMTggMjhoMXYxaC0xek0xOSAyOGgxdjFoLTF6TTIzIDI4aDF2MWgtMXpNMjUgMjhoMXYxaC0xek0yOSAyOGgxdjFoLTF6TTMxIDI4aDF2MWgtMXpNMzMgMjhoMXYxaC0xek0zNCAyOGgxdjFoLTF6TTM4IDI4aDF2MWgtMXpNNDAgMjhoMXYxaC0xek00MSAyOGgxdjFoLTF6TTQ0IDI4aDF2MWgtMXpNMiAyOWgxdjFoLTF6TTMgMjloMXYxaC0xek00IDI5aDF2MWgtMXpNOCAyOWgxdjFoLTF6TTExIDI5aDF2MWgtMXpNMTIgMjloMXYxaC0xek0xOSAyOWgxdjFoLTF6TTIwIDI5aDF2MWgtMXpNMjQgMjloMXYxaC0xek0yNyAyOWgxdjFoLTF6TTI5IDI5aDF2MWgtMXpNMzAgMjloMXYxaC0xek0zMiAyOWgxdjFoLTF6TTM1IDI5aDF2MWgtMXpNMzggMjloMXYxaC0xek00MiAyOWgxdjFoLTF6TTQzIDI5aDF2MWgtMXpNMCAzMGgxdjFoLTF6TTEgMzBoMXYxaC0xek0zIDMwaDF2MWgtMXpNNSAzMGgxdjFoLTF6TTYgMzBoMXYxaC0xek04IDMwaDF2MWgtMXpNOSAzMGgxdjFoLTF6TTEyIDMwaDF2MWgtMXpNMTMgMzBoMXYxaC0xek0xNSAzMGgxdjFoLTF6TTE4IDMwaDF2MWgtMXpNMjAgMzBoMXYxaC0xek0yMiAzMGgxdjFoLTF6TTI1IDMwaDF2MWgtMXpNMjYgMzBoMXYxaC0xek0yNyAzMGgxdjFoLTF6TTI4IDMwaDF2MWgtMXpNMzQgMzBoMXYxaC0xek0zOSAzMGgxdjFoLTF6TTQxIDMwaDF2MWgtMXpNNDMgMzBoMXYxaC0xek0wIDMxaDF2MWgtMXpNMSAzMWgxdjFoLTF6TTMgMzFoMXYxaC0xek00IDMxaDF2MWgtMXpNOCAzMWgxdjFoLTF6TTkgMzFoMXYxaC0xek0xMCAzMWgxdjFoLTF6TTEyIDMxaDF2MWgtMXpNMTMgMzFoMXYxaC0xek0xNCAzMWgxdjFoLTF6TTE1IDMxaDF2MWgtMXpNMTYgMzFoMXYxaC0xek0xNyAzMWgxdjFoLTF6TTIwIDMxaDF2MWgtMXpNMjMgMzFoMXYxaC0xek0yNCAzMWgxdjFoLTF6TTI1IDMxaDF2MWgtMXpNMjcgMzFoMXYxaC0xek0yOCAzMWgxdjFoLTF6TTI5IDMxaDF2MWgtMXpNMzAgMzFoMXYxaC0xek0zMSAzMWgxdjFoLTF6TTMyIDMxaDF2MWgtMXpNMzMgMzFoMXYxaC0xek0zNSAzMWgxdjFoLTF6TTM4IDMxaDF2MWgtMXpNMzkgMzFoMXYxaC0xek00MSAzMWgxdjFoLTF6TTQyIDMxaDF2MWgtMXpNNDQgMzFoMXYxaC0xek0yIDMyaDF2MWgtMXpNMyAzMmgxdjFoLTF6TTQgMzJoMXYxaC0xek02IDMyaDF2MWgtMXpNNyAzMmgxdjFoLTF6TTggMzJoMXYxaC0xek05IDMyaDF2MWgtMXpNMTEgMzJoMXYxaC0xek0xNiAzMmgxdjFoLTF6TTE4IDMyaDF2MWgtMXpNMTkgMzJoMXYxaC0xek0yMyAzMmgxdjFoLTF6TTI1IDMyaDF2MWgtMXpNMjkgMzJoMXYxaC0xek0zMSAzMmgxdjFoLTF6TTM2IDMyaDF2MWgtMXpNMzggMzJoMXYxaC0xek0zOSAzMmgxdjFoLTF6TTQwIDMyaDF2MWgtMXpNNDEgMzJoMXYxaC0xek00NCAzMmgxdjFoLTF6TTEgMzNoMXYxaC0xek0zIDMzaDF2MWgtMXpNNCAzM2gxdjFoLTF6TTUgMzNoMXYxaC0xek0xMyAzM2gxdjFoLTF6TTE0IDMzaDF2MWgtMXpNMjAgMzNoMXYxaC0xek0yMSAzM2gxdjFoLTF6TTIyIDMzaDF2MWgtMXpNMjMgMzNoMXYxaC0xek0yNSAzM2gxdjFoLTF6TTI4IDMzaDF2MWgtMXpNMjkgMzNoMXYxaC0xek0zMCAzM2gxdjFoLTF6TTMxIDMzaDF2MWgtMXpNMzUgMzNoMXYxaC0xek0zNyAzM2gxdjFoLTF6TTM4IDMzaDF2MWgtMXpNMzkgMzNoMXYxaC0xek00MSAzM2gxdjFoLTF6TTQyIDMzaDF2MWgtMXpNNDQgMzNoMXYxaC0xek00IDM0aDF2MWgtMXpNNiAzNGgxdjFoLTF6TTcgMzRoMXYxaC0xek0xMCAzNGgxdjFoLTF6TTE0IDM0aDF2MWgtMXpNMTUgMzRoMXYxaC0xek0xNiAzNGgxdjFoLTF6TTE4IDM0aDF2MWgtMXpNMjAgMzRoMXYxaC0xek0yMiAzNGgxdjFoLTF6TTI1IDM0aDF2MWgtMXpNMjcgMzRoMXYxaC0xek0zMiAzNGgxdjFoLTF6TTM2IDM0aDF2MWgtMXpNMzcgMzRoMXYxaC0xek0zOSAzNGgxdjFoLTF6TTQzIDM0aDF2MWgtMXpNMSAzNWgxdjFoLTF6TTIgMzVoMXYxaC0xek0zIDM1aDF2MWgtMXpNNCAzNWgxdjFoLTF6TTcgMzVoMXYxaC0xek05IDM1aDF2MWgtMXpNMTEgMzVoMXYxaC0xek0xMiAzNWgxdjFoLTF6TTEzIDM1aDF2MWgtMXpNMTQgMzVoMXYxaC0xek0xNSAzNWgxdjFoLTF6TTE3IDM1aDF2MWgtMXpNMTggMzVoMXYxaC0xek0xOSAzNWgxdjFoLTF6TTIxIDM1aDF2MWgtMXpNMjIgMzVoMXYxaC0xek0yMyAzNWgxdjFoLTF6TTI0IDM1aDF2MWgtMXpNMjUgMzVoMXYxaC0xek0yNiAzNWgxdjFoLTF6TTI3IDM1aDF2MWgtMXpNMjkgMzVoMXYxaC0xek0zMSAzNWgxdjFoLTF6TTMyIDM1aDF2MWgtMXpNMzUgMzVoMXYxaC0xek0zNiAzNWgxdjFoLTF6TTM4IDM1aDF2MWgtMXpNNDAgMzVoMXYxaC0xek00MSAzNWgxdjFoLTF6TTQyIDM1aDF2MWgtMXpNNDQgMzVoMXYxaC0xek0wIDM2aDF2MWgtMXpNMyAzNmgxdjFoLTF6TTQgMzZoMXYxaC0xek02IDM2aDF2MWgtMXpNNyAzNmgxdjFoLTF6TTggMzZoMXYxaC0xek05IDM2aDF2MWgtMXpNMTIgMzZoMXYxaC0xek0xMyAzNmgxdjFoLTF6TTE0IDM2aDF2MWgtMXpNMTUgMzZoMXYxaC0xek0xOSAzNmgxdjFoLTF6TTIwIDM2aDF2MWgtMXpNMjEgMzZoMXYxaC0xek0yMiAzNmgxdjFoLTF6TTIzIDM2aDF2MWgtMXpNMjQgMzZoMXYxaC0xek0yOSAzNmgxdjFoLTF6TTMxIDM2aDF2MWgtMXpNMzQgMzZoMXYxaC0xek0zNiAzNmgxdjFoLTF6TTM3IDM2aDF2MWgtMXpNMzggMzZoMXYxaC0xek0zOSAzNmgxdjFoLTF6TTQwIDM2aDF2MWgtMXpNNDMgMzZoMXYxaC0xek00NCAzNmgxdjFoLTF6TTggMzdoMXYxaC0xek0xMiAzN2gxdjFoLTF6TTE0IDM3aDF2MWgtMXpNMTUgMzdoMXYxaC0xek0xNiAzN2gxdjFoLTF6TTE3IDM3aDF2MWgtMXpNMTggMzdoMXYxaC0xek0yMCAzN2gxdjFoLTF6TTI0IDM3aDF2MWgtMXpNMjUgMzdoMXYxaC0xek0yOCAzN2gxdjFoLTF6TTI5IDM3aDF2MWgtMXpNMzAgMzdoMXYxaC0xek0zMyAzN2gxdjFoLTF6TTM1IDM3aDF2MWgtMXpNMzYgMzdoMXYxaC0xek00MCAzN2gxdjFoLTF6TTQxIDM3aDF2MWgtMXpNNDIgMzdoMXYxaC0xek00NCAzN2gxdjFoLTF6TTAgMzhoMXYxaC0xek0xIDM4aDF2MWgtMXpNMiAzOGgxdjFoLTF6TTMgMzhoMXYxaC0xek00IDM4aDF2MWgtMXpNNSAzOGgxdjFoLTF6TTYgMzhoMXYxaC0xek0xMyAzOGgxdjFoLTF6TTE0IDM4aDF2MWgtMXpNMTUgMzhoMXYxaC0xek0xOCAzOGgxdjFoLTF6TTIwIDM4aDF2MWgtMXpNMjIgMzhoMXYxaC0xek0yNCAzOGgxdjFoLTF6TTI2IDM4aDF2MWgtMXpNMjkgMzhoMXYxaC0xek0zMiAzOGgxdjFoLTF6TTM0IDM4aDF2MWgtMXpNMzUgMzhoMXYxaC0xek0zNiAzOGgxdjFoLTF6TTM4IDM4aDF2MWgtMXpNNDAgMzhoMXYxaC0xek00MiAzOGgxdjFoLTF6TTQzIDM4aDF2MWgtMXpNMCAzOWgxdjFoLTF6TTYgMzloMXYxaC0xek04IDM5aDF2MWgtMXpNMTIgMzloMXYxaC0xek0xMyAzOWgxdjFoLTF6TTE0IDM5aDF2MWgtMXpNMTYgMzloMXYxaC0xek0xOCAzOWgxdjFoLTF6TTE5IDM5aDF2MWgtMXpNMjAgMzloMXYxaC0xek0yNCAzOWgxdjFoLTF6TTI1IDM5aDF2MWgtMXpNMjYgMzloMXYxaC0xek0yNyAzOWgxdjFoLTF6TTI4IDM5aDF2MWgtMXpNMzAgMzloMXYxaC0xek0zMSAzOWgxdjFoLTF6TTMzIDM5aDF2MWgtMXpNMzUgMzloMXYxaC0xek0zNiAzOWgxdjFoLTF6TTQwIDM5aDF2MWgtMXpNNDEgMzloMXYxaC0xek00MiAzOWgxdjFoLTF6TTQ0IDM5aDF2MWgtMXpNMCA0MGgxdjFoLTF6TTIgNDBoMXYxaC0xek0zIDQwaDF2MWgtMXpNNCA0MGgxdjFoLTF6TTYgNDBoMXYxaC0xek04IDQwaDF2MWgtMXpNOSA0MGgxdjFoLTF6TTEwIDQwaDF2MWgtMXpNMTcgNDBoMXYxaC0xek0yMCA0MGgxdjFoLTF6TTIxIDQwaDF2MWgtMXpNMjIgNDBoMXYxaC0xek0yMyA0MGgxdjFoLTF6TTI0IDQwaDF2MWgtMXpNMjYgNDBoMXYxaC0xek0zMSA0MGgxdjFoLTF6TTMzIDQwaDF2MWgtMXpNMzQgNDBoMXYxaC0xek0zNSA0MGgxdjFoLTF6TTM2IDQwaDF2MWgtMXpNMzcgNDBoMXYxaC0xek0zOCA0MGgxdjFoLTF6TTM5IDQwaDF2MWgtMXpNNDAgNDBoMXYxaC0xek00MSA0MGgxdjFoLTF6TTAgNDFoMXYxaC0xek0yIDQxaDF2MWgtMXpNMyA0MWgxdjFoLTF6TTQgNDFoMXYxaC0xek02IDQxaDF2MWgtMXpNOCA0MWgxdjFoLTF6TTEwIDQxaDF2MWgtMXpNMTEgNDFoMXYxaC0xek0xMiA0MWgxdjFoLTF6TTEzIDQxaDF2MWgtMXpNMTQgNDFoMXYxaC0xek0xNyA0MWgxdjFoLTF6TTE4IDQxaDF2MWgtMXpNMjAgNDFoMXYxaC0xek0yMSA0MWgxdjFoLTF6TTIzIDQxaDF2MWgtMXpNMjUgNDFoMXYxaC0xek0yOCA0MWgxdjFoLTF6TTMwIDQxaDF2MWgtMXpNMzIgNDFoMXYxaC0xek0zOCA0MWgxdjFoLTF6TTM5IDQxaDF2MWgtMXpNNDIgNDFoMXYxaC0xek00MyA0MWgxdjFoLTF6TTQ0IDQxaDF2MWgtMXpNMCA0MmgxdjFoLTF6TTIgNDJoMXYxaC0xek0zIDQyaDF2MWgtMXpNNCA0MmgxdjFoLTF6TTYgNDJoMXYxaC0xek04IDQyaDF2MWgtMXpNOSA0MmgxdjFoLTF6TTEyIDQyaDF2MWgtMXpNMTQgNDJoMXYxaC0xek0xNiA0MmgxdjFoLTF6TTE3IDQyaDF2MWgtMXpNMTkgNDJoMXYxaC0xek0yMiA0MmgxdjFoLTF6TTI0IDQyaDF2MWgtMXpNMjYgNDJoMXYxaC0xek0yOCA0MmgxdjFoLTF6TTI5IDQyaDF2MWgtMXpNMzEgNDJoMXYxaC0xek0zMyA0MmgxdjFoLTF6TTM0IDQyaDF2MWgtMXpNMzUgNDJoMXYxaC0xek0zNiA0MmgxdjFoLTF6TTM3IDQyaDF2MWgtMXpNNDEgNDJoMXYxaC0xek00MyA0MmgxdjFoLTF6TTAgNDNoMXYxaC0xek02IDQzaDF2MWgtMXpNMTEgNDNoMXYxaC0xek0xMiA0M2gxdjFoLTF6TTE0IDQzaDF2MWgtMXpNMjAgNDNoMXYxaC0xek0yMiA0M2gxdjFoLTF6TTIzIDQzaDF2MWgtMXpNMjUgNDNoMXYxaC0xek0yOCA0M2gxdjFoLTF6TTI5IDQzaDF2MWgtMXpNMzAgNDNoMXYxaC0xek0zMSA0M2gxdjFoLTF6TTMzIDQzaDF2MWgtMXpNMzQgNDNoMXYxaC0xek0zNyA0M2gxdjFoLTF6TTQyIDQzaDF2MWgtMXpNMCA0NGgxdjFoLTF6TTEgNDRoMXYxaC0xek0yIDQ0aDF2MWgtMXpNMyA0NGgxdjFoLTF6TTQgNDRoMXYxaC0xek01IDQ0aDF2MWgtMXpNNiA0NGgxdjFoLTF6TTggNDRoMXYxaC0xek0xMCA0NGgxdjFoLTF6TTEyIDQ0aDF2MWgtMXpNMTQgNDRoMXYxaC0xek0xNSA0NGgxdjFoLTF6TTE2IDQ0aDF2MWgtMXpNMTcgNDRoMXYxaC0xek0xOCA0NGgxdjFoLTF6TTE5IDQ0aDF2MWgtMXpNMjIgNDRoMXYxaC0xek0yNCA0NGgxdjFoLTF6TTI2IDQ0aDF2MWgtMXpNMjkgNDRoMXYxaC0xek0zMCA0NGgxdjFoLTF6TTMxIDQ0aDF2MWgtMXpNMzUgNDRoMXYxaC0xek0zNiA0NGgxdjFoLTF6TTM4IDQ0aDF2MWgtMXpNMzkgNDRoMXYxaC0xek00MCA0NGgxdjFoLTF6TTQzIDQ0aDF2MWgtMXoiLz48L3N2Zz4=", "pass": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyOSAyOSIgc2hhcGUtcmVuZGVyaW5nPSJjcmlzcEVkZ2VzIj48cmVjdCB3aWR0aD0iMjkiIGhlaWdodD0iMjkiIGZpbGw9IiNmZmZmZmYiLz48cGF0aCBmaWxsPSIjMGYxODMwIiBkPSJNMCAwaDF2MWgtMXpNMSAwaDF2MWgtMXpNMiAwaDF2MWgtMXpNMyAwaDF2MWgtMXpNNCAwaDF2MWgtMXpNNSAwaDF2MWgtMXpNNiAwaDF2MWgtMXpNOSAwaDF2MWgtMXpNMTQgMGgxdjFoLTF6TTIyIDBoMXYxaC0xek0yMyAwaDF2MWgtMXpNMjQgMGgxdjFoLTF6TTI1IDBoMXYxaC0xek0yNiAwaDF2MWgtMXpNMjcgMGgxdjFoLTF6TTI4IDBoMXYxaC0xek0wIDFoMXYxaC0xek02IDFoMXYxaC0xek04IDFoMXYxaC0xek05IDFoMXYxaC0xek0xMiAxaDF2MWgtMXpNMTMgMWgxdjFoLTF6TTE3IDFoMXYxaC0xek0xOSAxaDF2MWgtMXpNMjIgMWgxdjFoLTF6TTI4IDFoMXYxaC0xek0wIDJoMXYxaC0xek0yIDJoMXYxaC0xek0zIDJoMXYxaC0xek00IDJoMXYxaC0xek02IDJoMXYxaC0xek0xMCAyaDF2MWgtMXpNMTUgMmgxdjFoLTF6TTE4IDJoMXYxaC0xek0xOSAyaDF2MWgtMXpNMjAgMmgxdjFoLTF6TTIyIDJoMXYxaC0xek0yNCAyaDF2MWgtMXpNMjUgMmgxdjFoLTF6TTI2IDJoMXYxaC0xek0yOCAyaDF2MWgtMXpNMCAzaDF2MWgtMXpNMiAzaDF2MWgtMXpNMyAzaDF2MWgtMXpNNCAzaDF2MWgtMXpNNiAzaDF2MWgtMXpNMTAgM2gxdjFoLTF6TTEzIDNoMXYxaC0xek0yMiAzaDF2MWgtMXpNMjQgM2gxdjFoLTF6TTI1IDNoMXYxaC0xek0yNiAzaDF2MWgtMXpNMjggM2gxdjFoLTF6TTAgNGgxdjFoLTF6TTIgNGgxdjFoLTF6TTMgNGgxdjFoLTF6TTQgNGgxdjFoLTF6TTYgNGgxdjFoLTF6TTggNGgxdjFoLTF6TTkgNGgxdjFoLTF6TTEwIDRoMXYxaC0xek0xMiA0aDF2MWgtMXpNMTMgNGgxdjFoLTF6TTE2IDRoMXYxaC0xek0xOSA0aDF2MWgtMXpNMjIgNGgxdjFoLTF6TTI0IDRoMXYxaC0xek0yNSA0aDF2MWgtMXpNMjYgNGgxdjFoLTF6TTI4IDRoMXYxaC0xek0wIDVoMXYxaC0xek02IDVoMXYxaC0xek0xMCA1aDF2MWgtMXpNMTEgNWgxdjFoLTF6TTEyIDVoMXYxaC0xek0xNCA1aDF2MWgtMXpNMTUgNWgxdjFoLTF6TTE2IDVoMXYxaC0xek0xOCA1aDF2MWgtMXpNMTkgNWgxdjFoLTF6TTIwIDVoMXYxaC0xek0yMiA1aDF2MWgtMXpNMjggNWgxdjFoLTF6TTAgNmgxdjFoLTF6TTEgNmgxdjFoLTF6TTIgNmgxdjFoLTF6TTMgNmgxdjFoLTF6TTQgNmgxdjFoLTF6TTUgNmgxdjFoLTF6TTYgNmgxdjFoLTF6TTggNmgxdjFoLTF6TTEwIDZoMXYxaC0xek0xMiA2aDF2MWgtMXpNMTQgNmgxdjFoLTF6TTE2IDZoMXYxaC0xek0xOCA2aDF2MWgtMXpNMjAgNmgxdjFoLTF6TTIyIDZoMXYxaC0xek0yMyA2aDF2MWgtMXpNMjQgNmgxdjFoLTF6TTI1IDZoMXYxaC0xek0yNiA2aDF2MWgtMXpNMjcgNmgxdjFoLTF6TTI4IDZoMXYxaC0xek05IDdoMXYxaC0xek0xNiA3aDF2MWgtMXpNMTcgN2gxdjFoLTF6TTE5IDdoMXYxaC0xek0yMCA3aDF2MWgtMXpNMCA4aDF2MWgtMXpNMiA4aDF2MWgtMXpNNCA4aDF2MWgtMXpNNiA4aDF2MWgtMXpNOSA4aDF2MWgtMXpNMTEgOGgxdjFoLTF6TTEyIDhoMXYxaC0xek0xNyA4aDF2MWgtMXpNMjAgOGgxdjFoLTF6TTI0IDhoMXYxaC0xek0yNyA4aDF2MWgtMXpNMCA5aDF2MWgtMXpNMiA5aDF2MWgtMXpNMyA5aDF2MWgtMXpNNCA5aDF2MWgtMXpNOCA5aDF2MWgtMXpNOSA5aDF2MWgtMXpNMTAgOWgxdjFoLTF6TTEyIDloMXYxaC0xek0xMyA5aDF2MWgtMXpNMTkgOWgxdjFoLTF6TTIwIDloMXYxaC0xek0yMiA5aDF2MWgtMXpNMjUgOWgxdjFoLTF6TTI4IDloMXYxaC0xek0wIDEwaDF2MWgtMXpNNCAxMGgxdjFoLTF6TTYgMTBoMXYxaC0xek04IDEwaDF2MWgtMXpNMTQgMTBoMXYxaC0xek0xOCAxMGgxdjFoLTF6TTIyIDEwaDF2MWgtMXpNMjMgMTBoMXYxaC0xek0yNCAxMGgxdjFoLTF6TTI2IDEwaDF2MWgtMXpNMjcgMTBoMXYxaC0xek0yOCAxMGgxdjFoLTF6TTIgMTFoMXYxaC0xek0zIDExaDF2MWgtMXpNNCAxMWgxdjFoLTF6TTcgMTFoMXYxaC0xek0xMSAxMWgxdjFoLTF6TTEyIDExaDF2MWgtMXpNMTMgMTFoMXYxaC0xek0xNCAxMWgxdjFoLTF6TTE1IDExaDF2MWgtMXpNMTcgMTFoMXYxaC0xek0yMiAxMWgxdjFoLTF6TTI0IDExaDF2MWgtMXpNMjcgMTFoMXYxaC0xek0xIDEyaDF2MWgtMXpNMiAxMmgxdjFoLTF6TTQgMTJoMXYxaC0xek01IDEyaDF2MWgtMXpNNiAxMmgxdjFoLTF6TTEwIDEyaDF2MWgtMXpNMTIgMTJoMXYxaC0xek0xNCAxMmgxdjFoLTF6TTE2IDEyaDF2MWgtMXpNMTcgMTJoMXYxaC0xek0yMCAxMmgxdjFoLTF6TTIyIDEyaDF2MWgtMXpNMjUgMTJoMXYxaC0xek0yNyAxMmgxdjFoLTF6TTI4IDEyaDF2MWgtMXpNMSAxM2gxdjFoLTF6TTMgMTNoMXYxaC0xek00IDEzaDF2MWgtMXpNOCAxM2gxdjFoLTF6TTExIDEzaDF2MWgtMXpNMTQgMTNoMXYxaC0xek0xNiAxM2gxdjFoLTF6TTE3IDEzaDF2MWgtMXpNMTggMTNoMXYxaC0xek0xOSAxM2gxdjFoLTF6TTIwIDEzaDF2MWgtMXpNMjEgMTNoMXYxaC0xek0yMiAxM2gxdjFoLTF6TTI1IDEzaDF2MWgtMXpNMjggMTNoMXYxaC0xek0xIDE0aDF2MWgtMXpNNiAxNGgxdjFoLTF6TTcgMTRoMXYxaC0xek0xMSAxNGgxdjFoLTF6TTEyIDE0aDF2MWgtMXpNMTMgMTRoMXYxaC0xek0yMSAxNGgxdjFoLTF6TTI1IDE0aDF2MWgtMXpNMjcgMTRoMXYxaC0xek0yOCAxNGgxdjFoLTF6TTEgMTVoMXYxaC0xek0yIDE1aDF2MWgtMXpNMyAxNWgxdjFoLTF6TTUgMTVoMXYxaC0xek05IDE1aDF2MWgtMXpNMTAgMTVoMXYxaC0xek0xNSAxNWgxdjFoLTF6TTE3IDE1aDF2MWgtMXpNMTggMTVoMXYxaC0xek0yMCAxNWgxdjFoLTF6TTIxIDE1aDF2MWgtMXpNMjIgMTVoMXYxaC0xek0yMyAxNWgxdjFoLTF6TTI1IDE1aDF2MWgtMXpNMjcgMTVoMXYxaC0xek0wIDE2aDF2MWgtMXpNMSAxNmgxdjFoLTF6TTIgMTZoMXYxaC0xek0zIDE2aDF2MWgtMXpNNCAxNmgxdjFoLTF6TTUgMTZoMXYxaC0xek02IDE2aDF2MWgtMXpNOCAxNmgxdjFoLTF6TTkgMTZoMXYxaC0xek0xNyAxNmgxdjFoLTF6TTIxIDE2aDF2MWgtMXpNMjIgMTZoMXYxaC0xek0yMyAxNmgxdjFoLTF6TTI1IDE2aDF2MWgtMXpNMjcgMTZoMXYxaC0xek0yOCAxNmgxdjFoLTF6TTIgMTdoMXYxaC0xek01IDE3aDF2MWgtMXpNOCAxN2gxdjFoLTF6TTkgMTdoMXYxaC0xek0xMCAxN2gxdjFoLTF6TTExIDE3aDF2MWgtMXpNMTMgMTdoMXYxaC0xek0xNSAxN2gxdjFoLTF6TTE2IDE3aDF2MWgtMXpNMTcgMTdoMXYxaC0xek0xOCAxN2gxdjFoLTF6TTIwIDE3aDF2MWgtMXpNMjEgMTdoMXYxaC0xek0yMiAxN2gxdjFoLTF6TTI1IDE3aDF2MWgtMXpNMjYgMTdoMXYxaC0xek0yOCAxN2gxdjFoLTF6TTAgMThoMXYxaC0xek0yIDE4aDF2MWgtMXpNNSAxOGgxdjFoLTF6TTYgMThoMXYxaC0xek03IDE4aDF2MWgtMXpNOCAxOGgxdjFoLTF6TTEwIDE4aDF2MWgtMXpNMTEgMThoMXYxaC0xek0xMiAxOGgxdjFoLTF6TTE0IDE4aDF2MWgtMXpNMTYgMThoMXYxaC0xek0yMSAxOGgxdjFoLTF6TTIyIDE4aDF2MWgtMXpNMjMgMThoMXYxaC0xek0yNyAxOGgxdjFoLTF6TTI4IDE4aDF2MWgtMXpNMSAxOWgxdjFoLTF6TTMgMTloMXYxaC0xek03IDE5aDF2MWgtMXpNOSAxOWgxdjFoLTF6TTEyIDE5aDF2MWgtMXpNMTMgMTloMXYxaC0xek0xNCAxOWgxdjFoLTF6TTE2IDE5aDF2MWgtMXpNMTcgMTloMXYxaC0xek0yMCAxOWgxdjFoLTF6TTIyIDE5aDF2MWgtMXpNMjQgMTloMXYxaC0xek0yNSAxOWgxdjFoLTF6TTI3IDE5aDF2MWgtMXpNMCAyMGgxdjFoLTF6TTMgMjBoMXYxaC0xek02IDIwaDF2MWgtMXpNNyAyMGgxdjFoLTF6TTExIDIwaDF2MWgtMXpNMTQgMjBoMXYxaC0xek0xNiAyMGgxdjFoLTF6TTE5IDIwaDF2MWgtMXpNMjAgMjBoMXYxaC0xek0yMSAyMGgxdjFoLTF6TTIyIDIwaDF2MWgtMXpNMjMgMjBoMXYxaC0xek0yNCAyMGgxdjFoLTF6TTggMjFoMXYxaC0xek0xNCAyMWgxdjFoLTF6TTE1IDIxaDF2MWgtMXpNMTYgMjFoMXYxaC0xek0xNyAyMWgxdjFoLTF6TTE4IDIxaDF2MWgtMXpNMTkgMjFoMXYxaC0xek0yMCAyMWgxdjFoLTF6TTI0IDIxaDF2MWgtMXpNMjYgMjFoMXYxaC0xek0yNyAyMWgxdjFoLTF6TTI4IDIxaDF2MWgtMXpNMCAyMmgxdjFoLTF6TTEgMjJoMXYxaC0xek0yIDIyaDF2MWgtMXpNMyAyMmgxdjFoLTF6TTQgMjJoMXYxaC0xek01IDIyaDF2MWgtMXpNNiAyMmgxdjFoLTF6TTkgMjJoMXYxaC0xek0xMSAyMmgxdjFoLTF6TTEzIDIyaDF2MWgtMXpNMTYgMjJoMXYxaC0xek0xOCAyMmgxdjFoLTF6TTE5IDIyaDF2MWgtMXpNMjAgMjJoMXYxaC0xek0yMiAyMmgxdjFoLTF6TTI0IDIyaDF2MWgtMXpNMjUgMjJoMXYxaC0xek0yNyAyMmgxdjFoLTF6TTI4IDIyaDF2MWgtMXpNMCAyM2gxdjFoLTF6TTYgMjNoMXYxaC0xek05IDIzaDF2MWgtMXpNMTAgMjNoMXYxaC0xek0xMSAyM2gxdjFoLTF6TTEyIDIzaDF2MWgtMXpNMTYgMjNoMXYxaC0xek0xNyAyM2gxdjFoLTF6TTE5IDIzaDF2MWgtMXpNMjAgMjNoMXYxaC0xek0yNCAyM2gxdjFoLTF6TTI1IDIzaDF2MWgtMXpNMjggMjNoMXYxaC0xek0wIDI0aDF2MWgtMXpNMiAyNGgxdjFoLTF6TTMgMjRoMXYxaC0xek00IDI0aDF2MWgtMXpNNiAyNGgxdjFoLTF6TTggMjRoMXYxaC0xek0xMCAyNGgxdjFoLTF6TTExIDI0aDF2MWgtMXpNMTcgMjRoMXYxaC0xek0xOCAyNGgxdjFoLTF6TTIwIDI0aDF2MWgtMXpNMjEgMjRoMXYxaC0xek0yMiAyNGgxdjFoLTF6TTIzIDI0aDF2MWgtMXpNMjQgMjRoMXYxaC0xek0yOCAyNGgxdjFoLTF6TTAgMjVoMXYxaC0xek0yIDI1aDF2MWgtMXpNMyAyNWgxdjFoLTF6TTQgMjVoMXYxaC0xek02IDI1aDF2MWgtMXpNOSAyNWgxdjFoLTF6TTExIDI1aDF2MWgtMXpNMTIgMjVoMXYxaC0xek0xMyAyNWgxdjFoLTF6TTE1IDI1aDF2MWgtMXpNMTYgMjVoMXYxaC0xek0xNyAyNWgxdjFoLTF6TTE4IDI1aDF2MWgtMXpNMjMgMjVoMXYxaC0xek0yNCAyNWgxdjFoLTF6TTI2IDI1aDF2MWgtMXpNMjcgMjVoMXYxaC0xek0yOCAyNWgxdjFoLTF6TTAgMjZoMXYxaC0xek0yIDI2aDF2MWgtMXpNMyAyNmgxdjFoLTF6TTQgMjZoMXYxaC0xek02IDI2aDF2MWgtMXpNOCAyNmgxdjFoLTF6TTkgMjZoMXYxaC0xek0xMCAyNmgxdjFoLTF6TTEyIDI2aDF2MWgtMXpNMTkgMjZoMXYxaC0xek0yMCAyNmgxdjFoLTF6TTIzIDI2aDF2MWgtMXpNMjQgMjZoMXYxaC0xek0yNSAyNmgxdjFoLTF6TTI4IDI2aDF2MWgtMXpNMCAyN2gxdjFoLTF6TTYgMjdoMXYxaC0xek05IDI3aDF2MWgtMXpNMTIgMjdoMXYxaC0xek0xMyAyN2gxdjFoLTF6TTE0IDI3aDF2MWgtMXpNMTUgMjdoMXYxaC0xek0xNyAyN2gxdjFoLTF6TTE5IDI3aDF2MWgtMXpNMjAgMjdoMXYxaC0xek0yMiAyN2gxdjFoLTF6TTIzIDI3aDF2MWgtMXpNMjQgMjdoMXYxaC0xek0yNyAyN2gxdjFoLTF6TTAgMjhoMXYxaC0xek0xIDI4aDF2MWgtMXpNMiAyOGgxdjFoLTF6TTMgMjhoMXYxaC0xek00IDI4aDF2MWgtMXpNNSAyOGgxdjFoLTF6TTYgMjhoMXYxaC0xek04IDI4aDF2MWgtMXpNOSAyOGgxdjFoLTF6TTEwIDI4aDF2MWgtMXpNMTEgMjhoMXYxaC0xek0xNCAyOGgxdjFoLTF6TTE1IDI4aDF2MWgtMXpNMTcgMjhoMXYxaC0xek0xOSAyOGgxdjFoLTF6TTIwIDI4aDF2MWgtMXpNMjIgMjhoMXYxaC0xek0yMyAyOGgxdjFoLTF6TTI0IDI4aDF2MWgtMXpNMjcgMjhoMXYxaC0xek0yOCAyOGgxdjFoLTF6Ii8+PC9zdmc+"};
+function qrImg(key, size) { const i = new Image(); i.src = QR_IMG[key]; i.alt = "QR 코드"; i.width = size; i.height = size; return i; }
+
+function todayTraining() {
+  const now = new Date();
+  const list = TRAININGS.map(t => ({ ...t, d: new Date(t.at) })).filter(t => dayDiff(t.d, now) === 0).sort((a, b) => a.d - b.d);
+  return list.find(t => t.d.getTime() + 3 * 3600000 > now.getTime()) || null;
+}
+function nextTraining() {
+  const now = new Date();
+  return TRAININGS.map(t => ({ ...t, d: new Date(t.at) })).filter(t => t.d > now).sort((a, b) => a.d - b.d)[0] || null;
+}
+function buildToday() {
+  let t = todayTraining();
+  const isToday = !!t;
+  if (!t) t = nextTraining();
+  if (!t) return null;
+  const n = dayDiff(t.d, new Date());
+  $("#tEye").textContent = isToday ? "오늘의 연수" : (n === 1 ? "내일 연수" : "다음 연수 · D-" + n);
+  const hh = String(t.d.getHours()).padStart(2, "0") + ":" + String(t.d.getMinutes()).padStart(2, "0");
+  $("#tWhen").textContent = (t.d.getMonth() + 1) + "." + String(t.d.getDate()).padStart(2, "0") + " (" + WD[t.d.getDay()] + ") " + hh;
+  const h = $("#tTitle"); h.textContent = "";
+  const cut = t.title.search(/ : |: | — /);
+  const main = cut > 0 ? t.title.slice(0, cut) : t.title;
+  const sub = cut > 0 ? t.title.slice(cut).replace(/^\s*[:—]\s*/, "") : "";
+  h.append(main.trim());
+  if (sub) { const sm = document.createElement("small"); sm.textContent = sub; h.appendChild(sm); }
+  h.classList.toggle("long", main.length > 16 && main.length <= 26);
+  h.classList.toggle("xlong", main.length > 26);
+  $("#tWho").textContent = t.who + " 선생님";
+  $("#tKind").hidden = t.kind !== "직무";
+  return t;
+}
+
+/* 장면 넘기기 */
+let scenes = [], idx = 0, elapsed = 0, last = performance.now(), paused = false;
+let perScene = store.get("secs", 10);
+function collect() {
+  const hasJ = buildJikmu();
+  const cLeft = dayDiff(CONTEST_END, new Date());
+  const contestOn = new Date() <= CONTEST_END;
+  const cdd = $("#contestDD");
+  if (cdd) { cdd.textContent = cLeft <= 0 ? "오늘 마감" : cLeft === 1 ? "내일 마감" : "D-" + cLeft; cdd.classList.toggle("hot", cLeft <= 3); }
+  const hasT = !!buildToday();
+  scenes = [...document.querySelectorAll(".scene")].filter(s => (s.dataset.key !== "today" || hasT) && (s.dataset.key !== "jikmu" || hasJ) && (s.dataset.key !== "contest" || contestOn) && !hidden.includes(s.dataset.key));
+  if (!scenes.length) scenes = [document.querySelector(".scene")];
+  document.querySelectorAll(".scene").forEach(s => { if (!scenes.includes(s)) s.classList.remove("on"); });
+  const p = $("#prog"); p.innerHTML = "";
+  scenes.forEach(() => { const s = document.createElement("div"); s.className = "seg"; s.innerHTML = "<i></i>"; p.appendChild(s); });
+}
+function show(i) {
+  idx = (i + scenes.length) % scenes.length;
+  if (idx === 0) collect();
+  scenes.forEach((s, k) => s.classList.toggle("on", k === idx));
+  [...$("#prog").children].forEach((seg, k) => { seg.classList.toggle("done", k < idx); seg.firstChild.style.width = k < idx ? "100%" : "0"; });
+  elapsed = 0;
+}
+
+/* 시계 */
+let mode = store.get("mode", "before");
+let minutes = store.get("minutes", 10);
+let endAt = Date.now() + minutes * 60000;
+function setMode(m, reset) {
+  mode = m; store.set("mode", m);
+  document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.mode === m)));
+  if (reset) {
+    const t = m === "before" ? todayTraining() : null;
+    endAt = (t && t.d.getTime() > Date.now()) ? t.d.getTime() : Date.now() + minutes * 60000;
+  }
+  tickClock();
+}
+function tickClock() {
+  const clock = $("#clock"), label = $("#clockLabel"), time = $("#clockTime");
+  if (mode === "loop") { clock.classList.add("no-time"); label.textContent = "연구회 소식을 전해 드려요"; return; }
+  clock.classList.remove("no-time");
+  const left = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+  if (left === 0) {
+    if (typeof onClockZero === "function") onClockZero();
+    clock.classList.add("no-time");
+    label.textContent = mode === "before" ? "곧 시작합니다" : "곧 다시 시작합니다";
+    return;
+  }
+  zeroDone = false;
+  label.textContent = mode === "before" ? "연수 시작까지" : "쉬는 시간 · 다시 시작까지";
+  time.textContent = String(Math.floor(left / 60)).padStart(2, "0") + ":" + String(left % 60).padStart(2, "0");
+}
+
+function loop(t) {
+  const dt = (t - last) / 1000; last = t;
+  if (!paused && scenes.length) {
+    elapsed += dt;
+    const seg = $("#prog").children[idx];
+    if (seg) seg.firstChild.style.width = Math.min(100, (elapsed / perScene) * 100) + "%";
+    if (elapsed >= perScene) show(idx + 1);
+  }
+  requestAnimationFrame(loop);
+}
+
+/* 설정 */
+const panel = $("#panel"), btn = $("#ctrlBtn");
+btn.addEventListener("click", () => { panel.hidden = !panel.hidden; btn.setAttribute("aria-expanded", String(!panel.hidden)); });
+document.querySelectorAll("[data-mode]").forEach(b => b.addEventListener("click", () => {
+  const m = b.dataset.mode;
+  $("#minutes").value = minutes; store.set("minutes", minutes);
+  setMode(m, true);
+}));
+$("#minutes").value = minutes;
+$("#minutes").addEventListener("change", e => { const v = Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 10)); minutes = v; e.target.value = v; store.set("minutes", v); });
+$("#restart").addEventListener("click", () => { endAt = Date.now() + minutes * 60000; tickClock(); });
+$("#secs").value = perScene;
+$("#secs").addEventListener("change", e => { const v = Math.max(4, Math.min(60, parseInt(e.target.value, 10) || 10)); perScene = v; e.target.value = v; store.set("secs", v); });
+function togglePause() { paused = !paused; const b = $("#pauseBtn"); b.textContent = paused ? "계속" : "멈춤"; b.classList.toggle("paused", paused); }
+$("#pauseBtn").addEventListener("click", togglePause);
+$("#prevBtn").addEventListener("click", () => show(idx - 1));
+$("#nextBtn").addEventListener("click", () => show(idx + 1));
+function fullscreen() {
+  const el = document.documentElement;
+  try { const p = document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen && el.requestFullscreen(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+$("#fsBtn").addEventListener("click", fullscreen);
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowRight") show(idx + 1);
+  else if (e.key === "ArrowLeft") show(idx - 1);
+  else if (e.key === " ") { e.preventDefault(); togglePause(); }
+  else if (e.key === "f" || e.key === "F") fullscreen();
+  else if (e.key === "m" || e.key === "M") toggleMusic();
+});
+let idleT;
+function wake() { document.body.classList.remove("idle"); clearTimeout(idleT); idleT = setTimeout(() => { if (panel.hidden) document.body.classList.add("idle"); }, 4000); }
+["mousemove", "keydown", "touchstart"].forEach(ev => document.addEventListener(ev, wake, { passive: true }));
+wake();
+
+function applyHidden() {
+  store.set("hide4", hidden);
+  markPreset();
+  document.querySelectorAll("#checks input").forEach(c => { c.checked = !hidden.includes(c.value); });
+  buildQR(); collect(); show(0);
+}
+const checks = $("#checks");
+Object.entries(SCENE_NAMES).forEach(([k, name]) => {
+  const l = document.createElement("label");
+  const c = document.createElement("input"); c.type = "checkbox"; c.id = "show-" + k; c.value = k;
+  c.addEventListener("change", () => { hidden = c.checked ? hidden.filter(h => h !== k) : [...new Set([...hidden, k])]; applyHidden(); });
+  const t = document.createElement("span"); t.textContent = name;
+  l.append(c, t); checks.appendChild(l);
+});
+document.querySelectorAll("#checks input").forEach(c => { c.checked = !hidden.includes(c.value); });
+function markPreset() {
+  const same = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+  $("#presetAll").setAttribute("aria-pressed", String(same(hidden, hideFor("open"))));
+  $("#presetMember").setAttribute("aria-pressed", String(same(hidden, hideFor("member"))));
+}
+let look = store.get("look", "open");
+function setLook(l) {
+  look = l; store.set("look", l);
+  document.body.classList.toggle("member", l === "member");
+  $("#whoFor").textContent = l === "member" ? "회원 연수" : "공개 연수";
+}
+setLook(look);
+$("#presetAll").addEventListener("click", () => { hidden = hideFor("open"); setLook("open"); applyHidden(); });
+$("#presetMember").addEventListener("click", () => { hidden = hideFor("member"); setLook("member"); applyHidden(); });
+markPreset();
+
+/* 배경 음악 (유튜브) */
+let player = null, ytReady = false, wantPlay = false, musicOn = false, fadeT = null, zeroDone = false, failCount = 0;
+let custom = store.get("ytCustom", null);
+let stIdx = Math.min(store.get("station", 0), STATIONS.length - (custom ? 0 : 1));
+let vol = store.get("vol", 35);
+const allStations = () => custom ? [...STATIONS, custom] : STATIONS;
+function ytId(u) {
+  const m = String(u).trim().match(/(?:v=|youtu\.be\/|\/live\/|\/embed\/|\/shorts\/)([\w-]{11})/) || String(u).trim().match(/^([\w-]{11})$/);
+  return m ? m[1] : null;
+}
+function fillStations() {
+  const sel = $("#station"); sel.innerHTML = "";
+  allStations().forEach((st, i) => { const o = document.createElement("option"); o.value = i; o.textContent = st.name; sel.appendChild(o); });
+  sel.value = stIdx;
+}
+function mstate(t) { $("#mstate").textContent = t; }
+function markMusic() {
+  document.body.classList.toggle("music-on", musicOn);
+  $("#musicBtn").classList.toggle("on", musicOn);
+  $("#musicBtn").setAttribute("aria-pressed", String(musicOn));
+  $("#musicBtn2").textContent = musicOn ? "끄기" : "켜기";
+  $("#onairName").textContent = allStations()[stIdx] ? allStations()[stIdx].name : "Jazz";
+}
+function fadeTo(target, ms, done) {
+  clearInterval(fadeT);
+  if (!player || !player.getVolume) { if (done) done(); return; }
+  const from = player.getVolume(), steps = Math.max(1, Math.round(ms / 100)); let k = 0;
+  fadeT = setInterval(() => { k++; player.setVolume(Math.round(from + (target - from) * k / steps)); if (k >= steps) { clearInterval(fadeT); if (done) done(); } }, 100);
+}
+function loadStation(i, play) {
+  stIdx = (i + allStations().length) % allStations().length; store.set("station", stIdx);
+  $("#station").value = stIdx; markMusic();
+  if (!ytReady) return;
+  const id = allStations()[stIdx].id;
+  if (play) { player.setVolume(0); player.loadVideoById(id); } else player.cueVideoById(id);
+}
+function startMusic() {
+  wantPlay = true; zeroDone = false;
+  if (!ytReady) { mstate("음악 불러오는 중…"); return; }
+  mstate("");
+  const st = player.getPlayerState ? player.getPlayerState() : -1;
+  if (st === 2 || st === 5) { player.setVolume(0); player.playVideo(); } else loadStation(stIdx, true);
+}
+function stopMusic() {
+  wantPlay = false;
+  fadeTo(0, 1500, () => { try { player.pauseVideo(); } catch (e) {} });
+  musicOn = false; markMusic();
+}
+function toggleMusic() { (musicOn || wantPlay) ? stopMusic() : startMusic(); }
+function onClockZero() {
+  if (zeroDone || !musicOn || !$("#autoFade").checked) return;
+  zeroDone = true; fadeTo(Math.round(vol * 0.25), 6000);
+}
+window.onYouTubeIframeAPIReady = function () {
+  player = new YT.Player("yt", {
+    width: "100%", height: "100%",
+    videoId: allStations()[stIdx].id,
+    playerVars: { autoplay: 0, controls: 1, playsinline: 1, rel: 0, origin: location.origin },
+    events: {
+      onReady: () => { ytReady = true; player.setVolume(vol); if (wantPlay) startMusic(); else mstate(""); },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) {
+          failCount = 0;
+          if (!wantPlay) { player.pauseVideo(); return; }
+          musicOn = true; markMusic(); mstate("");
+          if (!zeroDone) fadeTo(vol, 2500);
+        } else if (e.data === YT.PlayerState.PAUSED && wantPlay) {
+          musicOn = false; markMusic();
+        } else if (e.data === YT.PlayerState.ENDED && wantPlay) {
+          loadStation(stIdx + 1, true);
+        }
+      },
+      onError: () => {
+        failCount++;
+        if (failCount >= allStations().length) { mstate("지금은 재생되는 음악이 없어요. 유튜브 링크를 직접 넣어 보세요."); wantPlay = false; musicOn = false; markMusic(); failCount = 0; return; }
+        mstate("‘" + allStations()[stIdx].name + "’이 안 열려서 다음 음악으로 넘어가요.");
+        loadStation(stIdx + 1, wantPlay);
+      }
+    }
+  });
+};
+(function loadYT() {
+  if (location.protocol === "file:") { mstate("음악은 인터넷 주소(깃허브 페이지)로 열었을 때 나와요."); return; }
+  const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api"; s.async = true;
+  s.onerror = () => mstate("유튜브에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.");
+  document.head.appendChild(s);
+})();
+fillStations(); markMusic();
+$("#vol").value = vol;
+$("#vol").addEventListener("input", e => { vol = +e.target.value; store.set("vol", vol); clearInterval(fadeT); zeroDone = false; if (player && player.setVolume) player.setVolume(vol); });
+$("#station").addEventListener("change", e => { failCount = 0; loadStation(+e.target.value, wantPlay); });
+$("#musicBtn").addEventListener("click", toggleMusic);
+$("#musicBtn2").addEventListener("click", toggleMusic);
+$("#ytUse").addEventListener("click", () => {
+  const id = ytId($("#ytUrl").value);
+  if (!id) { mstate("유튜브 링크를 다시 확인해 주세요."); return; }
+  custom = { id, name: "내가 고른 음악" }; store.set("ytCustom", custom);
+  fillStations(); failCount = 0; $("#ytUrl").value = "";
+  loadStation(allStations().length - 1, true); wantPlay = true;
+});
+
+/* 시작 */
+buildQR();
+buildBigQR();
+collect();
+show(0);
+setMode(mode, true);
+setInterval(tickClock, 250);
+requestAnimationFrame(loop);
+try { navigator.wakeLock && navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {}
+</script>
+
+</body></html>
