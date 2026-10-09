@@ -2,13 +2,14 @@ name: check-pages
 on:
   push:
     branches: [ccr-c8e396d3-8slx6a]
-    paths: [.github/workflows/check-pages.yml]
+
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - run: sleep 150
       - run: |
-          for u in https://jianesbelle.github.io/belle-lab/ https://jianesbelle.github.io/belle-lab/godssam-lounge/ https://jianesbelle.github.io/belle-lab/sorigyeol/ https://jianesbelle.github.io/sena-0719/ https://jianesbelle.github.io/ https://jianesbelle.github.io/cheongnyang-SENA-calendar/; do
-            echo "== $u"; curl -sS -o body.html -D - "$u" | grep -iE '^(HTTP|location|server|x-github-request-id|cache-control|age)'; grep -o '<title>[^<]*' body.html | head -1
+          for u in https://jianesbelle.github.io/belle-lab/ https://jianesbelle.github.io/belle-lab/godssam-lounge/ https://jianesbelle.github.io/belle-lab/sorigyeol/ https://jianesbelle.github.io/belle-lab/docs/ https://jianesbelle.github.io/belle-lab/docs/godssam-lounge/ https://jianesbelle.github.io/belle-lab/docs/sorigyeol/; do
+            echo "== $u"; curl -sSL -o body.html -D - "$u" | grep -iE '^(HTTP|location|server|x-github-request-id|cache-control|age)'; grep -o '<title>[^<]*' body.html | head -1
           done
           dig +short jianesbelle.github.io
