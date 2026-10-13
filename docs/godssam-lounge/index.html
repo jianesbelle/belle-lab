@@ -197,6 +197,10 @@ h2 em { font-style: normal; color: var(--blue); }
 .tl-note b { color: var(--paper); }
 
 .today { height: 100%; display: flex; flex-direction: column; justify-content: center; max-width: 1300px; }
+.t-count { margin: 48px 0 0; display: inline-flex; align-items: center; gap: 22px; padding: 16px 30px 16px 26px; border-radius: 20px; background: var(--ink-2); border: 1px solid var(--line); align-self: flex-start; }
+.t-count[hidden] { display: none; }
+.t-count span { font: 500 28px/1 var(--body); color: var(--muted); }
+.t-count b { font: 600 64px/1 var(--mono); color: var(--signal); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
 .t-when { font: 600 40px/1 var(--mono); color: var(--signal); margin: 0 0 30px; font-variant-numeric: tabular-nums; }
 .t-title { font-size: 92px; line-height: 1.14; letter-spacing: -0.03em; }
 .t-title.long { font-size: 72px; }
@@ -285,6 +289,7 @@ body.music-on .onair { display: inline-flex; }
           <p class="t-when rise d1" id="tWhen">10.12 (월) 19:00</p>
           <h2 class="t-title rise d2" id="tTitle">연수 제목</h2>
           <p class="t-who rise d3"><span id="tWho">강사</span><span class="t-kind" id="tKind" hidden>직무연수</span></p>
+          <p class="t-count rise d4" id="tCount" hidden><span>연수 시작까지</span><b id="tCountTime">00:00</b></p>
         </div>
       </section>
 
@@ -644,6 +649,7 @@ function nextTraining() {
   const now = new Date();
   return TRAININGS.map(t => ({ ...t, d: new Date(t.at) })).filter(t => t.d > now).sort((a, b) => a.d - b.d)[0] || null;
 }
+let shownT = null;
 function buildToday() {
   let t = todayTraining();
   const isToday = !!t;
@@ -663,6 +669,7 @@ function buildToday() {
   h.classList.toggle("xlong", main.length > 26);
   $("#tWho").textContent = t.who + " 선생님";
   $("#tKind").hidden = t.kind !== "직무";
+  shownT = t;
   return t;
 }
 
@@ -691,7 +698,7 @@ function show(i) {
 }
 
 /* 시계 */
-let mode = store.get("mode", "before");
+let mode = "before"; // 열 때마다 '시작 전'으로 시작
 let minutes = store.get("minutes", 10);
 let endAt = Date.now() + minutes * 60000;
 function setMode(m, reset) {
@@ -703,7 +710,23 @@ function setMode(m, reset) {
   }
   tickClock();
 }
+function fmtLeft(sec) {
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s2 = sec % 60;
+  const mm = String(m).padStart(2, "0"), ss = String(s2).padStart(2, "0");
+  if (h >= 24) return Math.floor(h / 24) + "일 " + String(h % 24).padStart(2, "0") + ":" + mm + ":" + ss;
+  return h > 0 ? h + ":" + mm + ":" + ss : mm + ":" + ss;
+}
+function tickSlide() {
+  const box = $("#tCount");
+  if (!shownT) { box.hidden = true; return; }
+  const left = Math.round((shownT.d.getTime() - Date.now()) / 1000);
+  if (left < -600) { box.hidden = true; return; } // 시작하고 10분 지나면 숨겨요
+  box.hidden = false;
+  if (left > 0) { box.firstChild.textContent = "연수 시작까지"; $("#tCountTime").textContent = fmtLeft(left); }
+  else { box.firstChild.textContent = "곧 시작합니다"; $("#tCountTime").textContent = ""; }
+}
 function tickClock() {
+  tickSlide();
   const clock = $("#clock"), label = $("#clockLabel"), time = $("#clockTime");
   if (mode === "loop") { clock.classList.add("no-time"); label.textContent = "연구회 소식을 전해 드려요"; return; }
   clock.classList.remove("no-time");
@@ -716,7 +739,7 @@ function tickClock() {
   }
   zeroDone = false;
   label.textContent = mode === "before" ? "연수 시작까지" : "쉬는 시간 · 다시 시작까지";
-  time.textContent = String(Math.floor(left / 60)).padStart(2, "0") + ":" + String(left % 60).padStart(2, "0");
+  time.textContent = fmtLeft(left);
 }
 
 function loop(t) {
