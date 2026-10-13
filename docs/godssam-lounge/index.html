@@ -452,6 +452,7 @@ body.music-on .onair { display: inline-flex; }
   <button type="button" id="pauseBtn" class="mid">멈춤</button>
   <button type="button" id="nextBtn" aria-label="다음 장">다음 ›</button>
   <button type="button" id="musicBtn" class="music" aria-pressed="false">♪ 음악</button>
+  <button type="button" id="fsBtn2" aria-label="전체 화면">⛶ 전체 화면</button>
 </div>
 <button class="ctrl-btn" id="ctrlBtn" type="button" aria-expanded="false" aria-controls="panel">설정</button>
 <div class="panel" id="panel" hidden>
@@ -775,6 +776,8 @@ function fullscreen() {
   try { const p = document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen && el.requestFullscreen(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
 }
 $("#fsBtn").addEventListener("click", fullscreen);
+$("#fsBtn2").addEventListener("click", fullscreen);
+document.addEventListener("fullscreenchange", () => { $("#fsBtn2").textContent = document.fullscreenElement ? "⛶ 창 모드" : "⛶ 전체 화면"; });
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
   if (e.key === "ArrowRight") show(idx + 1);
